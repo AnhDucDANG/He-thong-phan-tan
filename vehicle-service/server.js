@@ -1,24 +1,54 @@
 // vehicle-service/server.js
 
 const express = require('express');
-require('dotenv').config(); // Tải biến môi trường từ file .env
+const mongoose = require('mongoose');
+const vehicleRoutes = require('./routes/vehicleRoutes');
+require('dotenv').config(); 
 
 const app = express();
-const PORT = process.env.PORT || 8001; // Cổng mặc định 8001
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/vehicle_db';
+const PORT = process.env.PORT || 8001;
 
-// Middleware
-app.use(express.json()); // Cho phép server đọc JSON từ request body
+// --- 1. Kết nối CSDL ---
+const connectDB = async () => {
+    try {
+        await mongoose.connect(MONGO_URI);
+        
+        // **LOG KẾT NỐI THÀNH CÔNG (Cần thiết để kiểm tra Docker)**
+        console.log(`✅ MongoDB Connected: ${MONGO_URI.split('@').pop()}`); 
 
-// Route kiểm tra trạng thái (Health Check)
+        // Sau khi kết nối thành công, bạn có thể gọi hàm chèn dữ liệu mẫu (Seed Data) ở đây
+        // seedVehicles(); 
+
+    } catch (err) {
+        // **LOG KẾT NỐI THẤT BẠI**
+        console.error(`❌ MongoDB Connection Error: ${err.message}`);
+        // Tùy chọn: Dừng ứng dụng nếu CSDL không kết nối được
+        process.exit(1); 
+    }
+};
+
+// --- 2. Khởi tạo Service ---
+app.use(express.json());
+app.use('/api/vehicles', vehicleRoutes);
+// Route kiểm tra trạng thái
 app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    service: "Vehicle Service", 
-    status: "Running", 
-    database: "Pending" // Sẽ cập nhật sau khi kết nối MongoDB
-  });
+    // Lý tưởng là kiểm tra trạng thái kết nối CSDL ở đây
+    res.status(200).json({ 
+        service: "Vehicle Service", 
+        status: "Running", 
+        database: mongoose.STATES[mongoose.connection.readyState] // Trạng thái kết nối
+    });
 });
 
-// Bắt đầu lắng nghe
-app.listen(PORT, () => {
-  console.log(`Vehicle Service is running on port ${PORT}`);
+app.get('/', (req, res) => {
+    res.send('Welcome to the Vehicle Microservice! Access API via /api/vehicles');
+});
+
+// Khởi chạy server và CSDL
+connectDB().then(() => {
+    app.listen(PORT, () => {
+        console.log(`Vehicle Service is running on port ${PORT}`);
+        console.log(`🔗 Local Access Link: http://localhost:${PORT}`);
+    });
 });
