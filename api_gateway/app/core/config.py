@@ -1,20 +1,16 @@
 import os
 
 class Settings:
-    # Gateway config
     GATEWAY_HOST = os.getenv("GATEWAY_HOST", "0.0.0.0")
     GATEWAY_PORT = int(os.getenv("GATEWAY_PORT", "8000"))
     
-    # Service URLs - ĐỌC TỪ .env
     USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://user_service:8001")
-    VEHICLE_SERVICE_URL = os.getenv("VEHICLE_SERVICE_URL", "http://localhost:8002")
-    BOOKING_SERVICE_URL = os.getenv("BOOKING_SERVICE_URL", "http://localhost:8003")
-    PAYMENT_SERVICE_URL = os.getenv("PAYMENT_SERVICE_URL", "http://localhost:8004")
-    
-    # Timeout (tăng lên vì kết nối qua Tailscale có thể chậm hơn)
-    REQUEST_TIMEOUT = 120  # 2 minutes
-    
-    # Service mapping
+    VEHICLE_SERVICE_URL = os.getenv("VEHICLE_SERVICE_URL", "http://vehicle_service:8002")
+    BOOKING_SERVICE_URL = os.getenv("BOOKING_SERVICE_URL", "http://booking_service:8003")
+    PAYMENT_SERVICE_URL = os.getenv("PAYMENT_SERVICE_URL", "http://payment_service:8004")
+
+    REQUEST_TIMEOUT = 120
+
     SERVICE_MAP = {
         "users": USER_SERVICE_URL,
         "vehicles": VEHICLE_SERVICE_URL,

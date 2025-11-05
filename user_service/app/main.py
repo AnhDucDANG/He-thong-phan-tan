@@ -1,15 +1,22 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+import logging
 from .routes import user_routes
 from .database.connection import check_connection
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 app = FastAPI(
     title="User Service",
-    description="Microservice quản lý người dùng cho hệ thống cho thuê xe",
+    description="Microservice for user management and authentication",
     version="1.0.0"
 )
 
-# CORS middleware
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,33 +25,46 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
+# Include routes
 app.include_router(user_routes.router, prefix="/users", tags=["Users"])
 
 @app.on_event("startup")
 async def startup_event():
-    """Kiểm tra kết nối MongoDB khi khởi động"""
-    if not check_connection():
-        raise Exception("Cannot connect to MongoDB. Please check your configuration.")
-    print("✅ Connected to MongoDB successfully!")
+    """Check database connection on startup"""
+    logger.info("🚀 Starting User Service...")
+    if check_connection():
+        logger.info("✅ MongoDB connected successfully")
+    else:
+        logger.error("❌ MongoDB connection failed")
 
-@app.get("/", tags=["Root"])
-def read_root():
+@app.get("/")
+def root():
     return {
         "service": "User Service",
         "status": "running",
         "version": "1.0.0"
     }
 
-@app.get("/health", tags=["Health"])
+@app.get("/health")
 def health_check():
     """Health check endpoint"""
-    db_status = check_connection()
-    
-    if not db_status:
-        raise HTTPException(status_code=500, detail="Database connection failed")
-    
-    return {
-        "status": "healthy",
-        "database": "connected"
-    }
+    try:
+        db_status = "healthy" if check_connection() else "unhealthy"
+        
+        return {
+            "status": "healthy" if db_status == "healthy" else "unhealthy",
+            "service": "user_service",
+            "database": db_status,
+            "version": "1.0.0"
+        }
+    except Exception as e:
+        logger.error(f"Health check error: {e}")
+        return {
+            "status": "unhealthy",
+            "service": "user_service",
+            "error": str(e)
+        }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8001)

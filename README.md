@@ -282,3 +282,38 @@ docker exec rental-mongo mongosh --eval "db.adminCommand('ping')"
 
 # Restart MongoDB
 docker-compose restart mongo
+
+
+SỬ DỤNG 2 FILE DOCKER-COMPOSE
+📋 CÁC LỆNH CƠ BẢN
+🔵 Development Mode (Expose ports)
+# Start development environment
+docker-compose -f docker-compose.dev.yml --env-file .env up -d
+
+# Rebuild và start
+docker-compose -f docker-compose.dev.yml --env-file .env up -d --build
+
+# Stop
+docker-compose -f docker-compose.dev.yml down
+
+# Xem logs
+docker-compose -f docker-compose.dev.yml logs -f
+
+# Xem status
+docker-compose -f docker-compose.dev.yml ps
+
+🔴 Production Mode (Ẩn ports)
+# Start production environment
+docker-compose -f docker-compose.prod.yml --env-file .env up -d
+
+# Rebuild và start
+docker-compose -f docker-compose.prod.yml --env-file .env up -d --build
+
+# Stop
+docker-compose -f docker-compose.prod.yml down
+
+# Xem logs
+docker-compose -f docker-compose.prod.yml logs -f
+
+# Xem status
+docker-compose -f docker-compose.prod.yml ps

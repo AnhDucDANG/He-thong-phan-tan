@@ -1,13 +1,8 @@
-version: '3.8'
-
 services:
-  # MongoDB Database
   mongo:
     image: mongo:6.0
     container_name: rental-mongo
     restart: unless-stopped
-    ports:
-      - "27017:27017"  # ✅ Bind to all interfaces
     volumes:
       - mongo_data:/data/db
     environment:
@@ -20,15 +15,12 @@ services:
       timeout: 5s
       retries: 5
 
-  # User Service
   user_service:
     build:
       context: ./user_service
       dockerfile: Dockerfile
     container_name: rental-user-service
     restart: unless-stopped
-    ports:
-      - "8001:8001"  # ✅ Bind to all interfaces
     environment:
       - MONGO_URL=mongodb://mongo:27017
       - MONGO_DB=rental_user_db
@@ -40,8 +32,12 @@ services:
         condition: service_healthy
     networks:
       - rental-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # API Gateway
   api_gateway:
     build:
       context: ./api_gateway
@@ -49,7 +45,7 @@ services:
     container_name: rental-api-gateway
     restart: unless-stopped
     ports:
-      - "8000:8000"  # ✅ Bind to all interfaces
+      - "8000:8000"  
     environment:
       - GATEWAY_HOST=0.0.0.0
       - GATEWAY_PORT=8000
@@ -59,9 +55,14 @@ services:
       - PAYMENT_SERVICE_URL=${PAYMENT_SERVICE_URL}
     depends_on:
       user_service:
-        condition: service_started
+        condition: service_healthy
     networks:
       - rental-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   mongo_data:
