@@ -9,7 +9,6 @@ class UserRegister(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     email: EmailStr
     password: str = Field(..., min_length=6)
-    # ✅ Chỉ cho phép đăng ký customer, admin được tạo bằng script
     role: Literal["customer"] = "customer"  
     full_name: Optional[str] = Field(None, max_length=100)
     phone: Optional[str] = None
@@ -123,5 +122,5 @@ class UserStatsResponse(BaseModel):
     """Schema for user statistics"""
     total_users: int
     verified_users: int
-    customers: int  # ✅ Chỉ còn customers
+    customers: int
     admins: int

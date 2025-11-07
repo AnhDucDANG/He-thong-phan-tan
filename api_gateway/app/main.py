@@ -6,14 +6,12 @@ import traceback
 from .core.config import settings
 from .routes import gateway_routes, proxy_routes
 
-# Logging configuration
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
-# FastAPI app
+ 
 app = FastAPI(
     title="API Gateway",
     description="Central gateway for rental system microservices",
@@ -31,7 +29,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ Request logging middleware with error handling
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     try:

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, Header
 from fastapi.responses import JSONResponse
 import httpx
 import logging
@@ -21,12 +21,13 @@ def is_public_route(path: str) -> bool:
 
 @router.api_route(
     "/{service}/{path:path}",
-    methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+    methods=["GET", "POST", "PUT", "DELETE", "PATCH"]
 )
 async def proxy_request(
     service: str,
     path: str,
     request: Request,
+    authorization: str = Header(None)
 ):
 
     # Construct full path for logging
@@ -45,36 +46,28 @@ async def proxy_request(
     else:
         logger.info(f"🌐 Public request to {full_path}")
     
-    # Get service URL from service map
-    if service not in settings.SERVICE_MAP:
+    # Validate service exists
+    if service not in settings.SERVICE_ROUTES:
         logger.error(f"❌ Unknown service: '{service}'")
-        logger.error(f"Available services: {list(settings.SERVICE_MAP.keys())}")
+        logger.error(f"Available services: {list(settings.SERVICE_ROUTES.keys())}")
         raise HTTPException(
             status_code=404,
             detail=f"Service '{service}' not found"
         )
     
-    service_base_url = settings.SERVICE_MAP[service]
+    # Get target service URL
+    target_url = settings.SERVICE_ROUTES[service]
     
-    if path:
-        target_url = f"{service_base_url}/{service}/{path}"
+    if service == "vehicles":
+        full_url = f"{target_url}/api/vehicles/{path}" if path else f"{target_url}/api/vehicles"
     else:
-        target_url = f"{service_base_url}/{service}"
+        full_url = f"{target_url}/{service}/{path}" if path else f"{target_url}/{service}"
     
-    logger.info(f"📡 Forwarding: {request.method} {full_path} → {target_url}")
+    logger.info(f"📡 Forwarding: {request.method} {full_path} → {full_url}")
     
-    try:
-        response = await forward_request(request, target_url)
-        logger.info(f"✅ Response from {service}: {response.status_code}")
-        return response
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        logger.error(f"❌ Error forwarding request: {e}")
-        raise HTTPException(
-            status_code=502,
-            detail=f"Error communicating with {service} service: {str(e)}"
-        )
+    # Forward request
+    response = await forward_request(request, full_url, authorization)
+    return response
 
 @router.get("/services")
 async def list_services():

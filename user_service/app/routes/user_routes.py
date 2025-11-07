@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 security = HTTPBearer()
 
-# ==================== HELPER FUNCTIONS ====================
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Get current authenticated user"""
@@ -67,7 +66,6 @@ async def get_current_admin(current_user: dict = Depends(get_current_user)):
         )
     return current_user
 
-# ==================== AUTHENTICATION ENDPOINTS ====================
 
 @router.post("/register", response_model=dict, status_code=status.HTTP_201_CREATED)
 async def register_user(user_data: UserRegister):
@@ -80,7 +78,6 @@ async def register_user(user_data: UserRegister):
     
     users_collection = get_users_collection()
     
-    # Check if email exists
     if users_collection.find_one({"email": user_data.email, "is_deleted": False}):
         logger.warning(f"⚠️ Email already exists: {user_data.email}")
         raise HTTPException(
@@ -88,7 +85,6 @@ async def register_user(user_data: UserRegister):
             detail="Email already registered"
         )
     
-    # Check if username exists
     if users_collection.find_one({"username": user_data.username, "is_deleted": False}):
         logger.warning(f"⚠️ Username already exists: {user_data.username}")
         raise HTTPException(
@@ -96,15 +92,13 @@ async def register_user(user_data: UserRegister):
             detail="Username already taken"
         )
     
-    # Generate verification token
     verification_token = generate_verification_token()
     
-    # Create user document (always customer for self-registration)
     user_doc = {
         "username": user_data.username,
         "email": user_data.email,
         "password_hash": get_password_hash(user_data.password),
-        "role": "customer",  # ✅ Always customer
+        "role": "customer",  
         "full_name": user_data.full_name,
         "phone": user_data.phone,
         "address": user_data.address,
@@ -158,13 +152,11 @@ async def login_user(credentials: UserLogin):
             detail="Account is inactive. Please contact support."
         )
     
-    # Update last login
     users_collection.update_one(
         {"_id": user["_id"]},
         {"$set": {"last_login": datetime.utcnow()}}
     )
     
-    # Create access token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user["email"], "role": user["role"]},
@@ -205,7 +197,6 @@ async def verify_email(data: VerifyEmail):
             detail="Verification token has expired"
         )
     
-    # Verify email
     users_collection.update_one(
         {"_id": user["_id"]},
         {
@@ -304,7 +295,6 @@ async def forgot_password(data: ForgotPassword):
     })
     
     if not user:
-        # Don't reveal if email exists
         return {"message": "If email exists, password reset link has been sent"}
     
     reset_token = generate_verification_token()
@@ -367,7 +357,6 @@ async def reset_password(data: ResetPassword):
     
     return {"message": "Password reset successfully"}
 
-# ==================== ADMIN ENDPOINTS ====================
 
 @router.get("/stats", response_model=UserStatsResponse)
 async def get_user_stats(admin_user: dict = Depends(get_current_admin)):
