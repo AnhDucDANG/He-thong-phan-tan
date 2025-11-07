@@ -1,25 +1,18 @@
-from decouple import config
+import os
+from typing import Optional
 
 class Settings:
-    # API Gateway
-    GATEWAY_HOST = config("GATEWAY_HOST", default="0.0.0.0")
-    GATEWAY_PORT = int(config("GATEWAY_PORT", default=8000))
+    # MongoDB
+    MONGO_URL: str = os.getenv("MONGO_URL", "mongodb://localhost:27017")
+    MONGO_DB: str = os.getenv("MONGO_DB", "rental_user_db")
     
-    # Service URLs - Dùng tên container khi chạy trong Docker
-    USER_SERVICE_URL = config("USER_SERVICE_URL", default="http://localhost:8001")
-    VEHICLE_SERVICE_URL = config("VEHICLE_SERVICE_URL", default="http://localhost:8002")
-    BOOKING_SERVICE_URL = config("BOOKING_SERVICE_URL", default="http://localhost:8003")
-    PAYMENT_SERVICE_URL = config("PAYMENT_SERVICE_URL", default="http://localhost:8004")
+    # JWT
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-here")
+    ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
     
-    # Timeout settings
-    REQUEST_TIMEOUT = 30
+    # Email verification
+    EMAIL_VERIFICATION_EXPIRE_HOURS: int = 24
+    PASSWORD_RESET_EXPIRE_HOURS: int = 1
     
-    # Service mapping
-    SERVICE_MAP = {
-        "users": USER_SERVICE_URL,
-        "vehicles": VEHICLE_SERVICE_URL,
-        "bookings": BOOKING_SERVICE_URL,
-        "payments": PAYMENT_SERVICE_URL,
-    }
-
 settings = Settings()

@@ -108,50 +108,6 @@ docker-compose logs -f
 .\test-system.ps1
 ```
 
----
-
-## 🛠️ Development
-
-### Rebuild sau khi sửa code
-
-```bash
-# Stop containers
-docker-compose down
-
-# Rebuild với no-cache
-docker-compose build --no-cache
-
-# Start lại
-docker-compose --env-file .env up -d
-```
-
-### Xem logs
-
-```bash
-# Tất cả services
-docker-compose logs -f
-
-# Service cụ thể
-docker-compose logs -f api_gateway
-docker-compose logs -f user_service
-docker-compose logs -f mongo
-```
-
-### Debug
-
-```bash
-# Exec vào container
-docker exec -it rental-api-gateway bash
-docker exec -it rental-user-service bash
-
-# Kiểm tra MongoDB
-docker exec -it rental-mongo mongosh
-> show dbs
-> use rental_user_db
-> db.users.find()
-```
-
----
 
 ## 🔐 Bảo mật
 
@@ -317,3 +273,26 @@ docker-compose -f docker-compose.prod.yml logs -f
 
 # Xem status
 docker-compose -f docker-compose.prod.yml ps
+
+tạo admin account : 
+insert to mongodb compass
+{
+  "username": "",
+  "email": "",
+  "password_hash": "$2a$12$vyhPT8a8SOIzoI3rxH.wL.8FptFcVxYATCMIU14QXFPwE22vX4FMG",
+  "role": "admin",
+  "full_name": "System Administrator",
+  "phone": "+84900000000",
+  "address": null,
+  "avatar_url": null,
+  "is_email_verified": true,
+  "email_verification_token": null,
+  "email_verification_expires": null,
+  "reset_password_token": null,
+  "reset_password_expires": null,
+  "created_at": { "$date": "2025-11-07T11:00:00.000Z" },
+  "updated_at": { "$date": "2025-11-07T11:00:00.000Z" },
+  "last_login": null,
+  "is_active": true,
+  "is_deleted": false
+}
