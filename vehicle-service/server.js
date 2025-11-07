@@ -8,7 +8,7 @@ require('dotenv').config();
 
 const app = express();
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/vehicle_db';
-const PORT = process.env.PORT || 8001;
+const PORT = process.env.PORT || 8002;
 
 // --- 1. Kết nối CSDL ---
 // const connectDB = async () => {
