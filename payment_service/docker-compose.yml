@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  booking_service:
+    build:
+      context: ./app
+      dockerfile: ../Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - ENV_FILE=.env
+    volumes:
+      - .:/app
+    networks:
+      - booking_network
+
+networks:
+  booking_network:
+    driver: bridge
