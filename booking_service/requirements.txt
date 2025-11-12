@@ -1,0 +1,23 @@
+# FastAPI và server
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# Validation và serialization
+pydantic[email]==2.5.0
+python-multipart==0.0.6
+
+# Database và ORM
+sqlalchemy==2.0.23
+pyodbc==4.0.39
+python-dotenv==1.0.0
+
+# Authentication và security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.1.2
+
+# HTTP client cho service communication
+httpx==0.25.1
+
+# Monitoring và logging
+prometheus-fastapi-instrumentator==6.1.0
