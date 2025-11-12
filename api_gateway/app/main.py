@@ -84,7 +84,7 @@ async def health_check():
         "version": "1.0.0"
     }
 
-# ✅ Enhanced exception handlers
+# Enhanced exception handlers
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     logger.warning(f"⚠️ HTTP Exception: {exc.status_code} - {exc.detail}")

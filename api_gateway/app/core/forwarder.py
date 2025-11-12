@@ -6,7 +6,7 @@ from .config import settings
 
 logger = logging.getLogger(__name__)
 
-async def forward_request(request: Request, target_url: str):
+async def forward_request(request: Request, target_url: str, authorization: str = None):
     """
     Forward HTTP request to target service
     """
@@ -14,28 +14,21 @@ async def forward_request(request: Request, target_url: str):
         # Get request data
         body = await request.body()
         
-        # Log request details
-        if body:
-            try:
-                body_preview = body[:200].decode('utf-8')
-                logger.info(f"📦 Request body preview: {body_preview}...")
-            except:
-                logger.info(f"📦 Request body size: {len(body)} bytes")
-        else:
-            logger.info("📦 Request body: (empty)")
-        
-        # Prepare headers (forward all headers except host)
+        # Prepare headers
         headers = dict(request.headers)
         headers.pop("host", None)
         
-        logger.info(f"🎯 Target URL: {target_url}")
-        logger.info(f"📋 Query params: {dict(request.query_params)}")
+        # Add authorization if provided
+        if authorization:
+            headers["authorization"] = authorization
+        
+        logger.info(f"🎯 Forwarding to: {target_url}")
+        logger.info(f"📋 Headers: {list(headers.keys())}")
         
         # Create HTTP client with timeout
         async with httpx.AsyncClient(timeout=settings.REQUEST_TIMEOUT) as client:
             
             # Forward request
-            logger.info(f"🚀 Sending {request.method} request...")
             response = await client.request(
                 method=request.method,
                 url=target_url,
@@ -45,30 +38,23 @@ async def forward_request(request: Request, target_url: str):
                 follow_redirects=True
             )
             
-            logger.info(f"✅ Received response: {response.status_code}")
-            logger.info(f"📄 Response content-type: {response.headers.get('content-type')}")
+            logger.info(f"✅ Response: {response.status_code}")
             
-            # ✅ PARSE RESPONSE CORRECTLY
+            # Parse response
             try:
-                # Try to parse as JSON
                 if "application/json" in response.headers.get("content-type", ""):
                     content = response.json()
-                    logger.info(f"📦 Response JSON: {str(content)[:200]}...")
                 else:
-                    content = response.text
-                    logger.info(f"📦 Response text: {content[:200]}...")
-            except Exception as parse_error:
-                logger.warning(f"⚠️ Failed to parse response: {parse_error}")
-                content = {"detail": response.text}
+                    content = {"data": response.text}
+            except Exception:
+                content = {"data": response.text}
             
-            # ✅ BUILD RESPONSE WITH PROPER HEADERS
+            # Build response headers
             response_headers = {}
             for key, value in response.headers.items():
-                # Skip headers that shouldn't be forwarded
                 if key.lower() not in ['content-encoding', 'content-length', 'transfer-encoding', 'connection']:
                     response_headers[key] = value
             
-            # Return response
             return JSONResponse(
                 content=content,
                 status_code=response.status_code,
@@ -76,25 +62,21 @@ async def forward_request(request: Request, target_url: str):
             )
             
     except httpx.ConnectError as e:
-        logger.error(f"❌ Connection error to {target_url}: {e}")
+        logger.error(f"❌ Connection error: {e}")
         raise HTTPException(
             status_code=503,
-            detail=f"Service unavailable: Could not connect to backend service"
+            detail="Service unavailable: Could not connect to backend service"
         )
     
     except httpx.TimeoutException as e:
-        logger.error(f"⏱️ Timeout error to {target_url}: {e}")
+        logger.error(f"⏱️ Timeout error: {e}")
         raise HTTPException(
             status_code=504,
-            detail=f"Service timeout: Backend service took too long to respond"
+            detail="Service timeout: Backend service took too long to respond"
         )
     
-    except HTTPException:
-        # Re-raise HTTP exceptions
-        raise
-    
     except Exception as e:
-        logger.error(f"❌ Unexpected error forwarding to {target_url}: {e}", exc_info=True)
+        logger.error(f"❌ Unexpected error: {e}", exc_info=True)
         raise HTTPException(
             status_code=502,
             detail=f"Bad Gateway: {str(e)}"

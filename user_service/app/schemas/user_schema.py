@@ -5,11 +5,11 @@ import re
 
 
 class UserRegister(BaseModel):
-    """Schema for user registration - Only customer can register"""
+    """Schema for user registration"""
     username: str = Field(..., min_length=3, max_length=50)
     email: EmailStr
     password: str = Field(..., min_length=6)
-    role: Literal["customer"] = "customer"  
+    role: Literal["customer", "admin"] = "customer"
     full_name: Optional[str] = Field(None, max_length=100)
     phone: Optional[str] = None
     address: Optional[str] = None

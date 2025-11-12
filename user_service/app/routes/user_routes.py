@@ -1,5 +1,5 @@
-from fastapi import APIRouter, HTTPException, Depends, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import APIRouter, HTTPException, Depends, status, Header, Form
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, OAuth2PasswordRequestForm
 from datetime import datetime, timedelta
 import logging
 import secrets  
@@ -15,11 +15,17 @@ from ..core.security import (
     create_verification_token_expiry, is_token_expired
 )
 from ..core.config import settings
-from ..database.connection import get_users_collection
+from ..database.connection import get_database, client
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 security = HTTPBearer()
+
+# ✅ Helper function
+def get_users_collection():
+    """Get users collection from database"""
+    db = get_database()
+    return db.users
 
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -70,35 +76,49 @@ async def get_current_admin(current_user: dict = Depends(get_current_user)):
 @router.post("/register", response_model=dict, status_code=status.HTTP_201_CREATED)
 async def register_user(user_data: UserRegister):
     """
-    Register a new customer account
-    - Only customers can self-register
-    - Admin accounts must be created via script/seeding
+    Register a new user account
+    - Customers can self-register
+    - Admin accounts can be created via this endpoint
     """
     logger.info(f"📝 Registration attempt for: {user_data.email}")
     
     users_collection = get_users_collection()
     
-    if users_collection.find_one({"email": user_data.email, "is_deleted": False}):
+    # Check email exists
+    existing_user = await users_collection.find_one({
+        "email": user_data.email,
+        "is_deleted": False
+    })
+    
+    if existing_user:
         logger.warning(f"⚠️ Email already exists: {user_data.email}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
         )
     
-    if users_collection.find_one({"username": user_data.username, "is_deleted": False}):
+    # Check username exists
+    existing_username = await users_collection.find_one({
+        "username": user_data.username,
+        "is_deleted": False
+    })
+    
+    if existing_username:
         logger.warning(f"⚠️ Username already exists: {user_data.username}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username already taken"
         )
     
+    # Generate verification token
     verification_token = generate_verification_token()
     
+    # Create user document
     user_doc = {
         "username": user_data.username,
         "email": user_data.email,
         "password_hash": get_password_hash(user_data.password),
-        "role": "customer",  
+        "role": user_data.role,  # ✅ Allow admin role
         "full_name": user_data.full_name,
         "phone": user_data.phone,
         "address": user_data.address,
@@ -117,53 +137,69 @@ async def register_user(user_data: UserRegister):
         "is_deleted": False
     }
     
-    result = users_collection.insert_one(user_doc)
+    # Insert user
+    result = await users_collection.insert_one(user_doc)
     
-    logger.info(f"✅ User registered successfully: {user_data.email}")
+    logger.info(f"✅ User registered successfully: {user_data.email} (role: {user_data.role})")
     
     return {
-        "message": "User registered successfully. Please check your email for verification.",
+        "message": f"{user_data.role.capitalize()} registered successfully",
         "user_id": str(result.inserted_id),
+        "email": user_data.email,
+        "role": user_data.role,
         "verification_token": verification_token
     }
 
 @router.post("/login", response_model=TokenResponse)
-async def login_user(credentials: UserLogin):
-    """Login user (both customer and admin) and return access token"""
-    logger.info(f"🔐 Login attempt for: {credentials.email}")
+async def login_user(form_data: OAuth2PasswordRequestForm = Depends()):
+    """
+    Login user (both customer and admin) and return access token
+    
+    Accepts OAuth2 form data:
+    - username: email address
+    - password: user password
+    """
+    # OAuth2PasswordRequestForm uses 'username' field, but we treat it as email
+    email = form_data.username
+    password = form_data.password
+    
+    logger.info(f"🔐 Login attempt for: {email}")
     
     users_collection = get_users_collection()
-    user = users_collection.find_one({
-        "email": credentials.email,
+    user = await users_collection.find_one({
+        "email": email,
         "is_deleted": False
     })
     
-    if not user or not verify_password(credentials.password, user["password_hash"]):
-        logger.warning(f"⚠️ Invalid credentials for: {credentials.email}")
+    if not user or not verify_password(password, user["password_hash"]):
+        logger.warning(f"⚠️ Invalid credentials for: {email}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password"
+            detail="Invalid email or password",
+            headers={"WWW-Authenticate": "Bearer"},
         )
     
     if not user.get("is_active", True):
-        logger.warning(f"⚠️ Inactive account login attempt: {credentials.email}")
+        logger.warning(f"⚠️ Inactive account login attempt: {email}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is inactive. Please contact support."
         )
     
-    users_collection.update_one(
+    # Update last login
+    await users_collection.update_one(
         {"_id": user["_id"]},
         {"$set": {"last_login": datetime.utcnow()}}
     )
     
+    # Create access token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user["email"], "role": user["role"]},
         expires_delta=access_token_expires
     )
     
-    logger.info(f"✅ Login successful for: {credentials.email} (role: {user['role']})")
+    logger.info(f"✅ Login successful for: {email} (role: {user['role']})")
     
     return {
         "access_token": access_token,
@@ -406,3 +442,273 @@ async def delete_account(current_user: dict = Depends(get_current_user)):
     logger.info(f"✅ Account deleted for: {current_user['email']}")
     
     return {"message": "Account deleted successfully"}
+
+# ==================== SHARDING ENDPOINTS ====================
+
+@router.get("/sharding/status", response_model=dict)
+async def get_sharding_status():
+    """Get detailed sharding information"""
+    from ..database.connection import get_database, client
+    
+    try:
+        db = get_database()
+        admin_db = client.admin
+        
+        # Get server status
+        server_status = await admin_db.command('serverStatus')
+        is_mongos = server_status.get('process') == 'mongos'
+        
+        if not is_mongos:
+            return {
+                "sharded": False,
+                "message": "Not connected to mongos router",
+                "process": server_status.get('process', 'unknown')
+            }
+        
+        # Get shards list
+        shards_info = await admin_db.command('listShards')
+        
+        # Get database stats
+        db_stats = await db.command('dbStats')
+        
+        # Get collections sharding info
+        collections_info = {}
+        for coll_name in ['users', 'vehicles', 'bookings', 'payments']:
+            try:
+                coll_stats = await db.command('collStats', coll_name)
+                collections_info[coll_name] = {
+                    "sharded": coll_stats.get('sharded', False),
+                    "count": coll_stats.get('count', 0),
+                    "size": coll_stats.get('size', 0),
+                    "shardKey": coll_stats.get('shardKey', {}),
+                    "shards": {}
+                }
+                
+                # Get shard distribution if sharded
+                if coll_stats.get('sharded') and 'shards' in coll_stats:
+                    for shard_name, shard_data in coll_stats['shards'].items():
+                        collections_info[coll_name]['shards'][shard_name] = {
+                            "count": shard_data.get('count', 0),
+                            "size": shard_data.get('size', 0)
+                        }
+                        
+            except Exception as e:
+                collections_info[coll_name] = {
+                    "error": str(e),
+                    "sharded": False
+                }
+        
+        return {
+            "sharded": True,
+            "process": "mongos",
+            "shards": shards_info.get('shards', []),
+            "database": {
+                "name": db.name,
+                "collections": db_stats.get('collections', 0),
+                "dataSize": db_stats.get('dataSize', 0),
+                "storageSize": db_stats.get('storageSize', 0),
+                "indexes": db_stats.get('indexes', 0)
+            },
+            "collections": collections_info
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting sharding status: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+@router.get("/sharding/list-shards", response_model=dict)
+async def list_shards():
+    """List all shards in the cluster"""
+    from ..database.connection import client
+    
+    try:
+        admin_db = client.admin
+        result = await admin_db.command('listShards')
+        
+        shards_list = []
+        for shard in result.get('shards', []):
+            shards_list.append({
+                "id": shard.get('_id'),
+                "host": shard.get('host'),
+                "state": shard.get('state', 1),
+                "tags": shard.get('tags', [])
+            })
+        
+        return {
+            "ok": result.get('ok', 0),
+            "shard_count": len(shards_list),
+            "shards": shards_list
+        }
+        
+    except Exception as e:
+        logger.error(f"Error listing shards: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+@router.get("/sharding/db-stats", response_model=dict)
+async def get_db_stats():
+    """Get database statistics"""
+    from ..database.connection import get_database
+    
+    try:
+        db = get_database()
+        stats = await db.command('dbStats')
+        
+        return {
+            "database": db.name,
+            "collections": stats.get('collections', 0),
+            "views": stats.get('views', 0),
+            "objects": stats.get('objects', 0),
+            "dataSize": stats.get('dataSize', 0),
+            "storageSize": stats.get('storageSize', 0),
+            "indexes": stats.get('indexes', 0),
+            "indexSize": stats.get('indexSize', 0),
+            "totalSize": stats.get('totalSize', 0),
+            "scaleFactor": stats.get('scaleFactor', 1)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting db stats: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+@router.post("/test-data/populate", response_model=dict)
+async def populate_test_data(
+    count: int = 50,
+    authorization: str = Header(None)
+):
+    """Populate test data for sharding demonstration"""
+    user = await verify_token(authorization)
+    
+    if user.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required"
+        )
+    
+    from ..database.connection import get_database
+    from ..core.security import get_password_hash
+    from datetime import datetime
+    
+    db = get_database()
+    
+    # Insert test users
+    users_data = [
+        {
+            "username": f"test_user_{i}",
+            "email": f"test{i}@example.com",
+            "full_name": f"Test User {i}",
+            "hashed_password": get_password_hash("Test123!"),
+            "role": "customer",
+            "phone": f"090{i:07d}",
+            "is_active": True,
+            "is_deleted": False,
+            "is_email_verified": True,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+        for i in range(1, count + 1)
+    ]
+    
+    result = await db.users.insert_many(users_data)
+    
+    return {
+        "message": f"{count} test users populated successfully",
+        "users_inserted": len(result.inserted_ids),
+        "note": "Check distribution with /distribution endpoint"
+    }
+
+@router.get("/distribution", response_model=dict)
+async def get_user_distribution(authorization: str = Header(None)):
+    """Get user distribution across shards"""
+    user = await verify_token(authorization)
+    
+    if user.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required"
+        )
+    
+    from ..database.connection import get_database
+    
+    db = get_database()
+    
+    try:
+        # Get collection stats
+        stats = await db.command('collStats', 'users')
+        
+        total_count = stats.get('count', 0)
+        
+        distribution = {
+            "collection": "users",
+            "total_users": total_count,
+            "sharded": stats.get('sharded', False),
+            "shard_key": stats.get('shardKey', {}),
+            "shard_distribution": {}
+        }
+        
+        if stats.get('sharded') and 'shards' in stats:
+            for shard_name, shard_data in stats['shards'].items():
+                count = shard_data.get('count', 0)
+                percentage = round(count / total_count * 100, 2) if total_count > 0 else 0
+                
+                distribution["shard_distribution"][shard_name] = {
+                    "count": count,
+                    "size_bytes": shard_data.get('size', 0),
+                    "percentage": f"{percentage}%"
+                }
+        else:
+            distribution["message"] = "Collection is not sharded or no shards info available"
+        
+        return distribution
+        
+    except Exception as e:
+        logger.error(f"Error getting distribution: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+@router.get("/sharding/explain", response_model=dict)
+async def get_query_explain(
+    collection: str = "users",
+    authorization: str = Header(None)
+):
+    """Get explain plan for sharded query"""
+    user = await verify_token(authorization)
+    
+    if user.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required"
+        )
+    
+    from ..database.connection import get_database
+    
+    db = get_database()
+    
+    try:
+        # Get explain for a simple query
+        cursor = db[collection].find({}).limit(10)
+        explain = await cursor.explain()
+        
+        return {
+            "collection": collection,
+            "queryPlanner": explain.get('queryPlanner', {}),
+            "executionStats": explain.get('executionStats', {}),
+            "serverInfo": explain.get('serverInfo', {})
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting explain: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )

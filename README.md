@@ -187,16 +187,6 @@ mongodb://100.69.63.99:27017
   role: String (customer/admin),
   created_at: Date
 }
-```
-
-### PostgreSQL (Vehicle & Booking Services)
-
-- **Port:** 5432
-- **Database:** rental_vehicle_db / rental_booking_db
-- **User:** rental_user
-- **Password:** [Xem trong .env của member]
-
----
 
 ## 🚨 Troubleshooting
 
@@ -296,3 +286,12 @@ insert to mongodb compass
   "is_active": true,
   "is_deleted": false
 }
+
+# Dừng và xóa tất cả
+docker-compose -f docker-compose.yml down -v
+
+# Xóa containers cũ
+docker rm -f $(docker ps -aq) 2>$null
+
+# Start cluster với luồng mới
+docker-compose -f docker-compose.yml up -d --build

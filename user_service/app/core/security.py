@@ -5,31 +5,25 @@ from typing import Optional
 import secrets
 from .config import settings
 
-# ✅ Configure bcrypt to handle truncation automatically
+# Configure bcrypt to handle truncation automatically
 pwd_context = CryptContext(
     schemes=["bcrypt"],
     deprecated="auto",
     bcrypt__ident="2b",
-    bcrypt__truncate_error=False  # Disable error, auto-truncate instead
+    bcrypt__truncate_error=False  
 )
-
-# ==================== PASSWORD HASHING ====================
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against a hash"""
-    # ✅ Truncate to 72 BYTES (not characters)
     password_bytes = plain_password.encode('utf-8')[:72]
     truncated_password = password_bytes.decode('utf-8', errors='ignore')
     return pwd_context.verify(truncated_password, hashed_password)
 
 def get_password_hash(password: str) -> str:
     """Hash a password"""
-    # ✅ Truncate to 72 BYTES (not characters)
     password_bytes = password.encode('utf-8')[:72]
     truncated_password = password_bytes.decode('utf-8', errors='ignore')
     return pwd_context.hash(truncated_password)
-
-# ==================== JWT TOKEN ====================
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create JWT access token"""
@@ -51,8 +45,6 @@ def verify_token(token: str) -> Optional[dict]:
         return payload
     except JWTError:
         return None
-
-# ==================== VERIFICATION TOKENS ====================
 
 def generate_verification_token() -> str:
     """Generate a secure random token for email verification or password reset"""

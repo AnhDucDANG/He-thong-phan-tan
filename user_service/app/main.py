@@ -1,24 +1,35 @@
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 import logging
-import traceback
-from .routes import user_routes
-from .database.connection import check_connection
+from datetime import datetime
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+from .core.config import settings
+from .database.connection import connect_db, close_db, get_database, get_client
+from .routes import user_routes
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown events"""
+    logger.info("🚀 Starting User Service...")
+    await connect_db()
+    logger.info("✅ Connected to MongoDB")
+    yield
+    logger.info("👋 Shutting down User Service...")
+    await close_db()
+    logger.info("✅ Closed MongoDB connection")
 
 app = FastAPI(
     title="User Service",
-    description="Microservice for user management and authentication",
-    version="1.0.0"
+    description="User management microservice for Car Rental System",
+    version="1.0.0",
+    lifespan=lifespan
 )
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -27,55 +38,85 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routes
-app.include_router(user_routes.router, prefix="/users", tags=["Users"])
-
-@app.on_event("startup")
-async def startup_event():
-    """Check database connection on startup"""
-    logger.info("🚀 Starting User Service...")
-    if check_connection():
-        logger.info("✅ MongoDB connected successfully")
-    else:
-        logger.error("❌ MongoDB connection failed")
+# Include routers
+app.include_router(user_routes.router, tags=["users"])
 
 @app.get("/")
-def root():
+async def root():
+    """Root endpoint"""
     return {
         "service": "User Service",
+        "version": "1.0.0",
         "status": "running",
-        "version": "1.0.0"
+        "timestamp": datetime.utcnow().isoformat()
     }
 
 @app.get("/health")
-def health_check():
-    """Health check endpoint"""
+async def health_check():
+    """Health check endpoint with sharding info"""
     try:
-        db_status = "healthy" if check_connection() else "unhealthy"
+        db = get_database()
+        client = get_client()
+        admin_db = client.admin
+
+        await db.command('ping')
         
-        return {
-            "status": "healthy" if db_status == "healthy" else "unhealthy",
+        server_info = await admin_db.command('serverStatus')
+        process_type = server_info.get('process', 'unknown')
+        
+        is_mongos = process_type == 'mongos'
+        
+        health_info = {
+            "status": "healthy",
             "service": "user_service",
-            "database": db_status,
-            "version": "1.0.0"
+            "database": "connected",
+            "timestamp": datetime.utcnow().isoformat(),
+            "mongodb": {
+                "connected": True,
+                "process": process_type,
+                "is_sharded": is_mongos,
+                "database": db.name,
+                "host": str(client.address) if hasattr(client, 'address') else "unknown"
+            }
         }
+        
+        if is_mongos:
+            try:
+                shards_result = await admin_db.command('listShards')
+                health_info["sharding"] = {
+                    "enabled": True,
+                    "shard_count": len(shards_result.get('shards', [])),
+                    "shards": [
+                        {
+                            "name": shard.get('_id'),
+                            "host": shard.get('host')
+                        }
+                        for shard in shards_result.get('shards', [])
+                    ]
+                }
+            except Exception as e:
+                logger.warning(f"Could not get sharding info: {e}")
+                health_info["sharding"] = {
+                    "enabled": True,
+                    "error": "Could not retrieve shard list"
+                }
+        else:
+            health_info["sharding"] = {
+                "enabled": False,
+                "message": "Not connected to mongos router"
+            }
+        
+        return health_info
+        
     except Exception as e:
-        logger.error(f"Health check error: {e}")
-        return {
-            "status": "unhealthy",
-            "service": "user_service",
-            "error": str(e)
-        }
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"❌ Unhandled exception: {exc}")
-    logger.error(traceback.format_exc())
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal Server Error", "error": str(exc)}
-    )
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+        logger.error(f"Health check failed: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "unhealthy",
+                "service": "user_service",
+                "database": "disconnected",
+                "error": str(e),
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )

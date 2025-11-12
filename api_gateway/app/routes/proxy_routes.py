@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, HTTPException, Header
 from fastapi.responses import JSONResponse
-import httpx
 import logging
+from typing import Optional
 from ..core.config import settings
 from ..core.forwarder import forward_request
 from ..middleware.auth_middleware import verify_authentication
@@ -27,50 +27,58 @@ async def proxy_request(
     service: str,
     path: str,
     request: Request,
-    authorization: str = Header(None)
+    authorization: Optional[str] = Header(None)
 ):
-
-    # Construct full path for logging
+    """
+    Proxy requests to microservices
+    Route: /api/{service}/{path}
+    """
+    
+    # Construct full path
     full_path = f"/api/{service}/{path}" if path else f"/api/{service}"
     
-    logger.info(f"📨 Received: {request.method} {request.url.path}")
-    logger.info(f"📍 Parsed - Service: '{service}', Path: '{path}'")
+    logger.info(f"📨 Incoming: {request.method} {full_path}")
+    logger.info(f"📍 Service: '{service}', Path: '{path}'")
     
+    # Check authentication for protected routes
     if not is_public_route(full_path):
         try:
             await verify_authentication(request)
-            logger.info(f"🔐 Authenticated request to {full_path}")
+            logger.info(f"🔐 Authenticated")
         except HTTPException as e:
-            logger.warning(f"🚫 Unauthorized request to {full_path}")
+            logger.warning(f"🚫 Unauthorized")
             raise e
     else:
-        logger.info(f"🌐 Public request to {full_path}")
+        logger.info(f"🌐 Public route")
     
     # Validate service exists
     if service not in settings.SERVICE_ROUTES:
         logger.error(f"❌ Unknown service: '{service}'")
-        logger.error(f"Available services: {list(settings.SERVICE_ROUTES.keys())}")
+        logger.error(f"📋 Available: {list(settings.SERVICE_ROUTES.keys())}")
         raise HTTPException(
             status_code=404,
             detail=f"Service '{service}' not found"
         )
     
     # Get target service URL
-    target_url = settings.SERVICE_ROUTES[service]
+    target_base_url = settings.SERVICE_ROUTES[service]
     
-    if service == "vehicles":
-        full_url = f"{target_url}/api/vehicles/{path}" if path else f"{target_url}/api/vehicles"
+    # Build full target URL
+    # User service expects routes WITHOUT /api prefix
+    if path:
+        target_url = f"{target_base_url}/{path}"
     else:
-        full_url = f"{target_url}/{service}/{path}" if path else f"{target_url}/{service}"
+        target_url = target_base_url
     
-    logger.info(f"📡 Forwarding: {request.method} {full_path} → {full_url}")
+    logger.info(f"🚀 Forward: {request.method} → {target_url}")
     
     # Forward request
-    response = await forward_request(request, full_url, authorization)
+    response = await forward_request(request, target_url, authorization)
     return response
 
 @router.get("/services")
 async def list_services():
+    """List all available services"""
     return {
         "gateway": "API Gateway v1.0.0",
         "total_services": len(settings.SERVICE_MAP),
