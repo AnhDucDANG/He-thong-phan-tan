@@ -1,15 +1,14 @@
-from sqlalchemy import Column, Integer, String, DateTime
-from sqlalchemy.ext.declarative import declarative_base
+from app.database.connection import db
 
-Base = declarative_base()
+class Payment(db.Model):
+    __tablename__ = "payments"
 
-class Booking(Base):
-    __tablename__ = 'bookings'
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    customer_name = Column(String, nullable=False)
-    booking_date = Column(DateTime, nullable=False)
-    status = Column(String, default='pending')
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    booking_id = db.Column(db.Integer, nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    status = db.Column(db.String(50), default="PENDING")
+    method = db.Column(db.String(50))
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
 
     def __repr__(self):
-        return f"<Booking(id={self.id}, customer_name={self.customer_name}, booking_date={self.booking_date}, status={self.status})>"
+        return f"<Payment {self.id} - {self.amount}>"

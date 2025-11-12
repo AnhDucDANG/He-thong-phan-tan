@@ -1,12 +1,13 @@
-class Config:
-    """Configuration settings for the application."""
-    
-    DEBUG = True  # Set to False in production
-    DATABASE_URL = "sqlite:///app.db"  # Example database URL
-    SECRET_KEY = "your_secret_key"  # Change this to a random secret key
-    ALLOWED_HOSTS = ["localhost", "127.0.0.1"]  # Allowed hosts for the application
+import os
+from dotenv import load_dotenv
 
-    @staticmethod
-    def init_app(app):
-        """Initialize the application with the configuration."""
-        pass  # Additional initialization logic can be added here if needed
+load_dotenv()
+
+class Config:
+    DB_SERVER = os.getenv("DB_SERVER")
+    DB_NAME = os.getenv("DB_NAME")
+    DB_USER = os.getenv("DB_USER")
+    DB_PASSWORD = os.getenv("DB_PASSWORD")
+    DB_DRIVER = os.getenv("DB_DRIVER", "ODBC Driver 17 for SQL Server")
+    DB_PORT = os.getenv("DB_PORT", "1433")
+    FLASK_PORT = int(os.getenv("FLASK_PORT", 8004))

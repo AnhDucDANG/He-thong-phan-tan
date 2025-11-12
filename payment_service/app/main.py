@@ -1,14 +1,19 @@
-from fastapi import FastAPI
-from app.routes.booking_routes import router as booking_router
+from flask import Flask
+from app.database.connection import init_db
+from app.core.config import Config
+from app.models.payment_model import Payment
 
-app = FastAPI()
+def create_app():
+    app = Flask(__name__)
+    db = init_db(app)
 
-app.include_router(booking_router)
+    @app.route('/')
+    def index():
+        return "✅ Payment Service connected to SQL Server successfully!"
 
-@app.get("/")
-def read_root():
-    return {"message": "Welcome to the Booking Service API!"}
+    return app
+
+app = create_app()
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    app.run(host="8.0.0.4", port=Config.FLASK_PORT, debug=True)

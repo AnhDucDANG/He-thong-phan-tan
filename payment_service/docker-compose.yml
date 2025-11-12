@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  booking_service:
+  payment_service:
     build:
       context: ./app
       dockerfile: ../Dockerfile
@@ -12,8 +12,8 @@ services:
     volumes:
       - .:/app
     networks:
-      - booking_network
+      - payment_network
 
 networks:
-  booking_network:
+  payment_network:
     driver: bridge
