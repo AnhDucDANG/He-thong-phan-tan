@@ -1,13 +1,18 @@
 import os
-from dotenv import load_dotenv
+from typing import Optional
 
-load_dotenv()
-
-class Config:
-    DB_SERVER = os.getenv("DB_SERVER")
-    DB_NAME = os.getenv("DB_NAME")
-    DB_USER = os.getenv("DB_USER")
-    DB_PASSWORD = os.getenv("DB_PASSWORD")
-    DB_DRIVER = os.getenv("DB_DRIVER", "ODBC Driver 17 for SQL Server")
-    DB_PORT = os.getenv("DB_PORT", "1433")
-    FLASK_PORT = int(os.getenv("FLASK_PORT", 8004))
+class Settings:
+    # MongoDB
+    MONGO_URL: str = os.getenv("MONGO_URL", "mongodb://localhost:27017")
+    MONGO_DB: str = os.getenv("MONGO_DB", "rental_user_db")
+    
+    # JWT
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-here")
+    ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+    
+    # Email verification
+    EMAIL_VERIFICATION_EXPIRE_HOURS: int = 24
+    PASSWORD_RESET_EXPIRE_HOURS: int = 1
+    
+settings = Settings()

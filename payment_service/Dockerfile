@@ -1,19 +1,26 @@
-FROM python:3.9-slim
+FROM python:3.12-slim
 
-# Set the working directory
 WORKDIR /app
 
-# Copy the requirements file
-COPY requirements.txt .
+# Install system dependencies including curl for healthcheck
+RUN apt-get update && apt-get install -y \
+    gcc \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install the dependencies
+# Copy requirements và cài đặt dependencies trước (cache layer)
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the application code
+# Copy source code
 COPY ./app ./app
 
-# Expose the port the app runs on
-EXPOSE 8000
+# Expose port
+EXPOSE 8004
 
-# Command to run the application
-CMD ["python", "app/main.py"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:8004/health')"
+
+# Run application
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8004", "--reload"]
