@@ -1,17 +1,20 @@
 from fastapi import FastAPI
-from app.routes.health_routes import router as health_router
 from fastapi import APIRouter
 from pydantic import BaseModel
-from booking_service.database import create_tables
-from booking_service.api.v1.booking_routes import router as booking_router
+from app.database import create_tables
+from app.routes.booking_routes import router as booking_router
+from app.routes.health_routes import router as health_router # <-- DÒNG MỚI ĐÃ THÊM
 
 app = FastAPI()
 
 create_tables()
-router = APIRouter()
+# router = APIRouter() # Dòng này không cần thiết vì bạn đã có booking_router
 app = FastAPI(title="Service 2 - Booking API")
-# đăng ký health route
-app.include_router(health_router)
+
+# Đăng ký Health Route ở cấp độ GỐC (root path) để Docker dễ dàng kiểm tra
+app.include_router(health_router, prefix="")
+
+# Đăng ký Booking Route với prefix /api/v1
 app.include_router(booking_router, prefix="/api/v1")
 
 @app.get("/")

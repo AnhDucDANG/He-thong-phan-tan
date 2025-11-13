@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
-import datetime
+# import datetime # Đã xóa
 from ..schemas.booking_schema import BookingCreate, BookingResponse
-from app.core.config import settings
+# from app.core.config import settings # Không cần thiết ở đây nữa
 
 router = APIRouter()
 
-#Api tạo đơn hàng
+# Api tạo đơn hàng
 @router.post("/bookings", response_model=BookingResponse, status_code=201)
 def create_booking(booking_data: BookingCreate):
     # b1: gọi User service
@@ -30,41 +30,16 @@ def create_booking(booking_data: BookingCreate):
     
     return {"booking_id": "MOCK-BKG-001", "status": "CONFIRMED"}
 
-#Api xem Booking
+# Api xem Booking
 @router.get("/bookings/{id}", response_model=BookingResponse)
 def get_booking_details(id: str):
     return {"booking_id": id, "status": "CONFIRMED"}
 
-#Api hủy Booking
+# Api hủy Booking
 @router.post("/bookings/{id}/cancel")
 def cancel_booking(id: str):
     # Gọi Car Service để giải phóng xe
     # car_service.release_car(id)
     return {"message": f"Booking {id} cancelled successfully"}
 
-@router.get("/health", tags=["health"])
-async def health(check_db: bool = False):
-    """
-    Health check cơ bản.
-    - check_db=True => thử kết nối tới database (nếu SQLALCHEMY_DATABASE_URL hợp lệ).
-    """
-    result = {
-        "service": "booking",
-        "status": "ok",
-        "time": datetime.datetime.utcnow().isoformat() + "Z",
-    }
-
-    if check_db:
-        try:
-            from sqlalchemy import create_engine, text
-
-            engine = create_engine(settings.SQLALCHEMY_DATABASE_URL, connect_args={"timeout": 5})
-            with engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
-            result["database"] = "ok"
-        except Exception as e:
-            result["database"] = "error"
-            result["db_error"] = str(e)
-            result["status"] = "degraded"
-
-    return result
+# Hàm health đã được chuyển sang app/routes/health_routes.py

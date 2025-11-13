@@ -1,24 +1,33 @@
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+import os
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker, declarative_base
+from app.core.config import settings
 
-SQLALCHEMY_DATABASE_URL = "mssql+pyodbc://sa:Lyly2505@localhost/CarBookingDB?driver=ODBC+Driver+17+for+SQL+Server"
-
+# Tạo engine từ URL trong settings
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, 
-    # pool_pre_ping=True giúp kiểm tra kết nối CSDL còn hoạt động không
-    # isolation_level="READ COMMITTED" (mức độ cao hơn cho concurrency)
+    settings.SQLALCHEMY_DATABASE_URL,
+    pool_pre_ping=True,
 )
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Session factory
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 
-# Khởi tạo Base class
+# Declarative base cho models
 Base = declarative_base()
 
-# Hàm Utility để lấy DB Session
+
 def get_db():
+    """Dependency: yield db session"""
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+
+
+def create_tables():
+    """Tạo các bảng (Base.metadata.create_all)"""
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        print(f"Warning: Could not create tables: {e}")
