@@ -23,7 +23,7 @@ services:
     build:
       context: ./payment_service
       dockerfile: Dockerfile
-    container_name: rental-user-service
+    container_name: rental-payment-service
     restart: unless-stopped
     ports:
       - "8004:8004"  

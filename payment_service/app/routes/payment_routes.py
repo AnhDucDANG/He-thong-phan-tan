@@ -1,132 +1,129 @@
-from typing import Optional, List
-from uuid import uuid4
-from enum import Enum
-from datetime import datetime
-from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, Field, PositiveFloat
+from fastapi import APIRouter, HTTPException, Depends, Request
+from sqlalchemy.orm import Session
+from app.database.connection import get_db
+from app.models.payment_model import Payment
+from pydantic import BaseModel
+from typing import List, Optional
+import urllib.parse
+import hashlib
+import hmac
 
-# File: payment_service/app/routes/payment_routes.py
-# Mô tả: định nghĩa các route liên quan đến thanh toán, sử dụng FastAPI
-# Ghi chú: toàn bộ chú thích bằng tiếng Việt
+import os
 
+# Lấy thông tin VNPay từ biến môi trường
+M49B55TZ = os.getenv("M49B55TZ", "TEST1234")        # mã merchant sandbox
+VNPAY_HASH_SECRET = os.getenv("1CDCMQ2WCGLIBX9KLZUFDLIG68Z51G7Z", "SECRET_KEY") # secret sandbox
+VNPAY_URL = os.getenv("VNPAY_URL", "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html")
+VNPAY_RETURN_URL = os.getenv("VNPAY_RETURN_URL", "http://localhost:3000/payment-return")
 
+router = APIRouter(
+    prefix="/payments",
+    tags=["payments"]
+)
 
-# Khởi tạo router để có thể gắn vào ứng dụng FastAPI chính
-router = APIRouter(prefix="/payments")
-
-# Cơ sở dữ liệu tạm thời trong bộ nhớ để ví dụ (thực tế nên dùng DB)
-# payments_db lưu dạng: {payment_id: PaymentOut.dict()}
-payments_db = {}
-
-# Định nghĩa trạng thái thanh toán
-class PaymentStatus(str, Enum):
-    pending = "pending"
-    succeeded = "succeeded"
-    failed = "failed"
-
-# Mô hình dữ liệu yêu cầu tạo thanh toán
+# -------------------- Schemas --------------------
 class PaymentCreate(BaseModel):
-    amount: PositiveFloat = Field(..., description="Số tiền (dương)")
-    currency: str = Field(..., min_length=3, max_length=3, description="Mã tiền tệ ISO 3 chữ cái, ví dụ VND, USD")
-    description: Optional[str] = Field(None, description="Mô tả thanh toán")
-    metadata: Optional[dict] = Field(default_factory=dict, description="Dữ liệu tùy ý lưu kèm")
-
-# Mô hình dữ liệu trả về cho client
-class PaymentOut(BaseModel):
-    id: str
+    user_id: int
+    booking_id: int
     amount: float
-    currency: str
-    description: Optional[str]
-    metadata: dict
-    status: PaymentStatus
-    created_at: datetime
 
-# Mô hình cập nhật trạng thái từ webhook hoặc admin
-class PaymentUpdate(BaseModel):
-    status: PaymentStatus
+class PaymentResponse(BaseModel):
+    id: int
+    user_id: int
+    booking_id: int
+    amount: float
+    status: str
+    payment_method: str
+    transaction_id: Optional[str]
 
-# Route: kiểm tra tình trạng dịch vụ
-@router.get("/health")
-def health_check():
-    """
-    Kiểm tra tình trạng của service.
-    Trả về "ok" nếu service hoạt động.
-    """
-    return {"status": "ok"}
+    class Config:
+        orm_mode = True
 
-# Route: tạo mới một thanh toán
-@router.post("/", response_model=PaymentOut, status_code=status.HTTP_201_CREATED)
-def create_payment(payload: PaymentCreate):
-    """
-    Tạo một payment mới.
-    - Sinh id mới
-    - Lưu vào bộ nhớ tạm
-    - Trả về đối tượng payment
-    """
-    payment_id = str(uuid4())
-    now = datetime.utcnow()
-    payment = PaymentOut(
-        id=payment_id,
-        amount=payload.amount,
-        currency=payload.currency.upper(),
-        description=payload.description,
-        metadata=payload.metadata or {},
-        status=PaymentStatus.pending,
-        created_at=now,
+class VNPayLinkResponse(BaseModel):
+    payment_id: int
+    vnpay_url: str
+
+class VNPayCallbackRequest(BaseModel):
+    # Tất cả param VNPay gửi callback
+    vnp_TxnRef: str
+    vnp_TransactionNo: str
+    vnp_ResponseCode: str
+    vnp_Amount: int
+    vnp_SecureHash: str
+
+# -------------------- Routes --------------------
+
+@router.post("/", response_model=PaymentResponse)
+def create_payment(payment: PaymentCreate, db: Session = Depends(get_db)):
+    db_payment = Payment(
+        user_id=payment.user_id,
+        booking_id=payment.booking_id,
+        amount=payment.amount,
+        status="pending"  # payment_method mặc định VNPay
     )
-    payments_db[payment_id] = payment.dict()
-    return payment
+    db.add(db_payment)
+    db.commit()
+    db.refresh(db_payment)
+    return db_payment
 
-# Route: lấy chi tiết một payment theo id
-@router.get("/{payment_id}", response_model=PaymentOut)
-def get_payment(payment_id: str):
-    """
-    Lấy chi tiết payment theo payment_id.
-    Nếu không tìm thấy sẽ trả về 404.
-    """
-    record = payments_db.get(payment_id)
-    if not record:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment không tồn tại")
-    return record
+@router.post("/{payment_id}/vnpay-link", response_model=VNPayLinkResponse)
+def create_vnpay_link(payment_id: int, db: Session = Depends(get_db)):
+    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
 
-# Route: danh sách payment (phân trang đơn giản)
-@router.get("/", response_model=List[PaymentOut])
-def list_payments(limit: int = 50, offset: int = 0):
-    """
-    Lấy danh sách các payment.
-    - limit: số bản ghi tối đa trả về
-    - offset: bỏ qua N bản ghi đầu
-    Lưu ý: Ví dụ này lấy từ bộ nhớ, không phù hợp cho production.
-    """
-    all_payments = list(payments_db.values())
-    # Sắp theo thời gian tạo giảm dần
-    all_payments.sort(key=lambda p: p["created_at"], reverse=True)
-    sliced = all_payments[offset : offset + limit]
-    return sliced
+    # Tham số VNPay
+    vnp_params = {
+        "vnp_Version": "2.1.0",
+        "vnp_Command": "pay",
+        "vnp_TmnCode": VNPAY_TMN_CODE,
+        "vnp_Amount": int(payment.amount * 100),  # VNPay nhân 100
+        "vnp_CurrCode": "VND",
+        "vnp_TxnRef": str(payment.id),
+        "vnp_OrderInfo": f"Thanh toán booking {payment.booking_id}",
+        "vnp_Locale": "vn",
+        "vnp_ReturnUrl": VNPAY_RETURN_URL,
+    }
 
-# Route: cập nhật trạng thái (ví dụ webhook từ cổng thanh toán)
-@router.post("/{payment_id}/status", response_model=PaymentOut)
-def update_payment_status(payment_id: str, update: PaymentUpdate):
-    """
-    Cập nhật trạng thái của payment.
-    Thường được gọi bởi webhook của bên thứ ba hoặc admin.
-    """
-    record = payments_db.get(payment_id)
-    if not record:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment không tồn tại")
-    # Cập nhật trạng thái và lưu lại
-    record["status"] = update.status
-    payments_db[payment_id] = record
-    return record
+    # Tạo query string sắp xếp theo key
+    query_string = "&".join(f"{k}={urllib.parse.quote(str(v))}" for k, v in sorted(vnp_params.items()))
+    # Tạo secure hash
+    vnp_secure_hash = hmac.new(VNPAY_HASH_SECRET.encode(), query_string.encode(), hashlib.sha256).hexdigest()
+    vnp_params["vnp_SecureHash"] = vnp_secure_hash
 
-# Route: xóa payment (chỉ ví dụ, thực tế cân nhắc soft-delete)
-@router.delete("/{payment_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_payment(payment_id: str):
+    vnpay_url = f"{VNPAY_URL}?{urllib.parse.urlencode(vnp_params)}"
+    return VNPayLinkResponse(payment_id=payment.id, vnpay_url=vnpay_url)
+
+@router.post("/vnpay-callback")
+async def vnpay_callback(request: Request, db: Session = Depends(get_db)):
     """
-    Xóa payment theo id.
-    Trả về 204 khi xóa thành công, 404 nếu không tồn tại.
+    Nhận callback từ VNPay sau khi user thanh toán
     """
-    if payment_id not in payments_db:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment không tồn tại")
-    del payments_db[payment_id]
-    return None
+    params = dict(request.query_params)
+    payment_id = int(params.get("vnp_TxnRef"))
+    secure_hash = params.get("vnp_SecureHash")
+
+    # Xác thực hash
+    query_params = {k: v for k, v in params.items() if k != "vnp_SecureHash"}
+    query_string = "&".join(f"{k}={urllib.parse.quote(str(v))}" for k, v in sorted(query_params.items()))
+    expected_hash = hmac.new(VNPAY_HASH_SECRET.encode(), query_string.encode(), hashlib.sha256).hexdigest()
+    if secure_hash != expected_hash:
+        raise HTTPException(status_code=400, detail="Invalid secure hash")
+
+    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    # Cập nhật trạng thái theo response code
+    response_code = params.get("vnp_ResponseCode")
+    transaction_no = params.get("vnp_TransactionNo")
+    if response_code == "00":
+        payment.status = "completed"
+    else:
+        payment.status = "failed"
+
+    payment.transaction_id = transaction_no
+    db.commit()
+    db.refresh(payment)
+
+    return {"message": "Payment status updated", "payment_id": payment.id, "status": payment.status}

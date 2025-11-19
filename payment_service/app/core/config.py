@@ -4,7 +4,7 @@ from typing import Optional
 class Settings:
     # MongoDB
     MONGO_URL: str = os.getenv("MONGO_URL", "mongodb://localhost:27017")
-    MONGO_DB: str = os.getenv("MONGO_DB", "rental_user_db")
+    MONGO_DB: str = os.getenv("MONGO_DB", "rental_payment_db")
     
     # JWT
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-here")
