@@ -29,158 +29,125 @@ sleep(5000);
 print("\n📦 Adding Shards to Cluster...");
 print("-".repeat(60));
 
-const shards = [
-    { name: "shard1", conn: "shard1ReplSet/mongo-shard1:27021", description: "Users" },
-    { name: "shard2a", conn: "shard2aReplSet/mongo-shard2a:27022", description: "Vehicles Hanoi" },
-    { name: "shard2b", conn: "shard2bReplSet/mongo-shard2b:27023", description: "Vehicles HCM" },
-    { name: "shard2c", conn: "shard2cReplSet/mongo-shard2c:27024", description: "Vehicles Danang" },
-    { name: "shard3", conn: "shard3ReplSet/mongo-shard3:27025", description: "Bookings" },
-    { name: "shard4", conn: "shard4ReplSet/mongo-shard4:27026", description: "Payments" }
-];
-
-shards.forEach(function(shard) {
-    try {
-        const result = sh.addShard(shard.conn);
-        print(`✅ ${shard.name} (${shard.description}) added`);
-    } catch (e) {
-        if (e.message.includes("already exists") || e.codeName === "ShardAlreadyExists") {
-            print(`ℹ️  ${shard.name} already exists`);
-        } else {
-            print(`⚠️  ${shard.name} error: ${e}`);
-        }
-    }
-});
-
-// ==================== ENABLE SHARDING ====================
-print("\n🔓 Enabling Sharding for Database...");
-print("-".repeat(60));
-
+// Add Shard 1: Users
+print('\n📦 Adding Shard 1 (Users)...');
 try {
-    sh.enableSharding("rental_db");
-    print("✅ Sharding enabled for rental_db");
-} catch (e) {
-    if (e.message.includes("already enabled")) {
-        print("ℹ️  Sharding already enabled for rental_db");
-    } else {
-        print("⚠️  Error enabling sharding: " + e);
-    }
+    const result1 = db.adminCommand({ 
+        addShard: 'shard1ReplSet/mongo-shard1:27021',
+        name: 'shard1'
+    });
+    print('✅ Shard 1 added:', JSON.stringify(result1));
+} catch (error) {
+    print('⚠️ Shard 1:', error.message);
 }
 
-sleep(3000);
+sleep(2000);
+
+// Add Shard 2: Vehicles (Single Shard)
+print('\n🚗 Adding Shard 2 (Vehicles - All Locations)...');
+try {
+    const result2 = db.adminCommand({ 
+        addShard: 'shard2ReplSet/mongo-shard2:27022',
+        name: 'shard2'
+    });
+    print('✅ Shard 2 added:', JSON.stringify(result2));
+} catch (error) {
+    print('⚠️ Shard 2:', error.message);
+}
+
+sleep(2000);
+
+// Add Shard 3: Bookings
+print('\n📅 Adding Shard 3 (Bookings)...');
+try {
+    const result3 = db.adminCommand({ 
+        addShard: 'shard3ReplSet/mongo-shard3:27023',
+        name: 'shard3'
+    });
+    print('✅ Shard 3 added:', JSON.stringify(result3));
+} catch (error) {
+    print('⚠️ Shard 3:', error.message);
+}
+
+sleep(2000);
+
+// Add Shard 4: Payments
+print('\n💳 Adding Shard 4 (Payments)...');
+try {
+    const result4 = db.adminCommand({ 
+        addShard: 'shard4ReplSet/mongo-shard4:27024',
+        name: 'shard4'
+    });
+    print('✅ Shard 4 added:', JSON.stringify(result4));
+} catch (error) {
+    print('⚠️ Shard 4:', error.message);
+}
+
+sleep(2000);
+
+// Enable sharding on database
+print('\n🔧 Enabling sharding on rental_db...');
+try {
+    const enableResult = db.adminCommand({ enableSharding: 'rental_db' });
+    print('✅ Sharding enabled:', JSON.stringify(enableResult));
+} catch (error) {
+    print('⚠️ Enable sharding:', error.message);
+}
+
+sleep(2000);
 
 // ==================== SHARD COLLECTIONS ====================
-print("\n📊 Sharding Collections...");
-print("-".repeat(60));
 
-// 1. USERS Collection - Hash Sharding
-print("\n1️⃣  Sharding 'users' collection (Hash on _id)...");
+// 1. Users Collection - Hash sharding by _id
+print('\n👥 Sharding users collection (hash by _id)...');
 try {
-    sh.shardCollection("rental_db.users", { _id: "hashed" });
-    print("✅ Users collection sharded");
-    
-    sh.addShardTag("shard1ReplSet", "users_shard");
-    sh.addTagRange(
-        "rental_db.users",
-        { _id: MinKey },
-        { _id: MaxKey },
-        "users_shard"
-    );
-    print("✅ Users tagged to shard1");
-} catch (e) {
-    if (e.message.includes("already sharded")) {
-        print("ℹ️  Users collection already sharded");
-    } else {
-        print("⚠️  Users error: " + e);
-    }
+    db.adminCommand({
+        shardCollection: 'rental_db.users',
+        key: { _id: 'hashed' }
+    });
+    print('✅ Users collection sharded');
+} catch (error) {
+    print('⚠️ Users sharding:', error.message);
 }
 
-// 2. VEHICLES Collection - Geographic Sharding
-print("\n2️⃣  Sharding 'vehicles' collection (Geographic on location)...");
+// 2. Vehicles Collection - Hash sharding by vehicle_id (SIMPLIFIED!)
+print('\n🚗 Sharding vehicles collection (hash by vehicle_id)...');
 try {
-    sh.shardCollection("rental_db.vehicles", { location: 1, _id: 1 });
-    print("✅ Vehicles collection sharded");
-    
-    // Add tags
-    sh.addShardTag("shard2aReplSet", "hanoi");
-    sh.addShardTag("shard2bReplSet", "hcm");
-    sh.addShardTag("shard2cReplSet", "danang");
-    
-    // Hanoi
-    sh.addTagRange(
-        "rental_db.vehicles",
-        { location: "hanoi", _id: MinKey },
-        { location: "hanoi", _id: MaxKey },
-        "hanoi"
-    );
-    
-    // HCM
-    sh.addTagRange(
-        "rental_db.vehicles",
-        { location: "hcm", _id: MinKey },
-        { location: "hcm", _id: MaxKey },
-        "hcm"
-    );
-    
-    // Danang
-    sh.addTagRange(
-        "rental_db.vehicles",
-        { location: "danang", _id: MinKey },
-        { location: "danang", _id: MaxKey },
-        "danang"
-    );
-    
-    print("✅ Vehicles geographic zones configured");
-} catch (e) {
-    if (e.message.includes("already sharded")) {
-        print("ℹ️  Vehicles collection already sharded");
-    } else {
-        print("⚠️  Vehicles error: " + e);
-    }
+    db.adminCommand({
+        shardCollection: 'rental_db.vehicles',
+        key: { vehicle_id: 'hashed' }
+    });
+    print('✅ Vehicles collection sharded');
+    print('ℹ️ All vehicles will be distributed across shard2 based on hash of vehicle_id');
+} catch (error) {
+    print('⚠️ Vehicles sharding:', error.message);
 }
 
-// 3. BOOKINGS Collection - Hash Sharding
-print("\n3️⃣  Sharding 'bookings' collection (Hash on user_id)...");
+// 3. Bookings Collection - Hash sharding by user_id
+print('\n📅 Sharding bookings collection (hash by user_id)...');
 try {
-    sh.shardCollection("rental_db.bookings", { user_id: "hashed" });
-    print("✅ Bookings collection sharded");
-    
-    sh.addShardTag("shard3ReplSet", "bookings_shard");
-    sh.addTagRange(
-        "rental_db.bookings",
-        { user_id: MinKey },
-        { user_id: MaxKey },
-        "bookings_shard"
-    );
-    print("✅ Bookings tagged to shard3");
-} catch (e) {
-    if (e.message.includes("already sharded")) {
-        print("ℹ️  Bookings collection already sharded");
-    } else {
-        print("⚠️  Bookings error: " + e);
-    }
+    db.adminCommand({
+        shardCollection: 'rental_db.bookings',
+        key: { user_id: 'hashed' }
+    });
+    print('✅ Bookings collection sharded');
+} catch (error) {
+    print('⚠️ Bookings sharding:', error.message);
 }
 
-// 4. PAYMENTS Collection - Range Sharding
-print("\n4️⃣  Sharding 'payments' collection (Range on booking_id)...");
+// 4. Payments Collection - Hash sharding by payment_id
+print('\n💳 Sharding payments collection (hash by payment_id)...');
 try {
-    sh.shardCollection("rental_db.payments", { booking_id: 1, _id: 1 });
-    print("✅ Payments collection sharded");
-    
-    sh.addShardTag("shard4ReplSet", "payments_shard");
-    sh.addTagRange(
-        "rental_db.payments",
-        { booking_id: MinKey, _id: MinKey },
-        { booking_id: MaxKey, _id: MaxKey },
-        "payments_shard"
-    );
-    print("✅ Payments tagged to shard4");
-} catch (e) {
-    if (e.message.includes("already sharded")) {
-        print("ℹ️  Payments collection already sharded");
-    } else {
-        print("⚠️  Payments error: " + e);
-    }
+    db.adminCommand({
+        shardCollection: 'rental_db.payments',
+        key: { payment_id: 'hashed' }
+    });
+    print('✅ Payments collection sharded');
+} catch (error) {
+    print('⚠️ Payments sharding:', error.message);
 }
+
+print('\n✅ All collections sharded successfully!');
 
 // ==================== VERIFY CONFIGURATION ====================
 print("\n\n📋 SHARDING STATUS:");

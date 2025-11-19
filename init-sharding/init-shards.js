@@ -1,107 +1,89 @@
-print("🔧 Initializing All Shard Replica Sets...");
-print("=".repeat(80));
+print("🔧 Initializing Shard Replica Sets...");
 
-const shards = [
-    { name: "shard1", replSetName: "shard1ReplSet", host: "mongo-shard1", port: 27021, description: "Users" },
-    { name: "shard2a", replSetName: "shard2aReplSet", host: "mongo-shard2a", port: 27022, description: "Vehicles Hanoi" },
-    { name: "shard2b", replSetName: "shard2bReplSet", host: "mongo-shard2b", port: 27023, description: "Vehicles HCM" },
-    { name: "shard2c", replSetName: "shard2cReplSet", host: "mongo-shard2c", port: 27024, description: "Vehicles Danang" },
-    { name: "shard3", replSetName: "shard3ReplSet", host: "mongo-shard3", port: 27025, description: "Bookings" },
-    { name: "shard4", replSetName: "shard4ReplSet", host: "mongo-shard4", port: 27026, description: "Payments" }
-];
-
-function initShard(shard) {
-    print(`\n📦 Initializing ${shard.name} (${shard.description})...`);
-    print("-".repeat(60));
+print('\n📦 Initializing Shard 1 (Users)...');
+try {
+    const shard1Config = {
+        _id: 'shard1ReplSet',
+        members: [
+            { _id: 0, host: 'mongo-shard1:27021' }
+        ]
+    };
+    const conn1 = new Mongo('mongo-shard1:27021');
+    const result1 = conn1.getDB('admin').runCommand({ replSetInitiate: shard1Config });
     
-    try {
-        const conn = new Mongo(`${shard.host}:${shard.port}`);
-        const admin = conn.getDB("admin");
-        
-        // Check if already initialized
-        try {
-            const status = admin.runCommand({ replSetGetStatus: 1 });
-            if (status.ok === 1) {
-                print(`ℹ️  ${shard.name} already initialized`);
-                return true;
-            }
-        } catch (e) {
-            // Not initialized yet, continue
-        }
-        
-        // Initialize replica set
-        const config = {
-            _id: shard.replSetName,
-            members: [
-                { _id: 0, host: `${shard.host}:${shard.port}` }
-            ]
-        };
-        
-        const result = admin.runCommand({ replSetInitiate: config });
-        
-        if (result.ok === 1) {
-            print(`✅ ${shard.name} replica set initiated`);
-            
-            // Wait for PRIMARY
-            print(`⏳ Waiting for ${shard.name} to become PRIMARY...`);
-            let waited = 0;
-            const maxWait = 30;
-            
-            while (waited < maxWait) {
-                try {
-                    const status = admin.runCommand({ replSetGetStatus: 1 });
-                    if (status.members && status.members[0] && status.members[0].stateStr === "PRIMARY") {
-                        print(`✅ ${shard.name} is now PRIMARY`);
-                        return true;
-                    }
-                } catch (e) {
-                    // Keep waiting
-                }
-                sleep(1000);
-                waited++;
-            }
-            
-            print(`⚠️  ${shard.name} took too long to become PRIMARY, but continuing...`);
-            return true;
-            
-        } else {
-            print(`❌ ${shard.name} initialization failed: ${JSON.stringify(result)}`);
-            return false;
-        }
-        
-    } catch (e) {
-        if (e.message && e.message.includes("already initialized")) {
-            print(`ℹ️  ${shard.name} already initialized`);
-            return true;
-        } else {
-            print(`❌ Error initializing ${shard.name}: ${e}`);
-            return false;
-        }
-    }
-}
-
-// Initialize all shards
-let successCount = 0;
-let failCount = 0;
-
-shards.forEach(function(shard) {
-    const success = initShard(shard);
-    if (success) {
-        successCount++;
+    if (result1.ok === 1) {
+        print('✅ Shard 1 (Users) initialized successfully');
     } else {
-        failCount++;
+        print('⚠️ Shard 1 response:', JSON.stringify(result1));
     }
-    sleep(3000); // Give time between initializations
-});
-
-print("\n" + "=".repeat(80));
-print(`📊 Initialization Summary:`);
-print(`   ✅ Successful: ${successCount}`);
-print(`   ❌ Failed: ${failCount}`);
-print(`   📦 Total: ${shards.length}`);
-
-if (failCount > 0) {
-    print("\n⚠️  Some shards failed, but continuing with cluster setup...");
+} catch (error) {
+    print('❌ Error initializing Shard 1:', error.message);
 }
 
-print("\n✅ Shard initialization phase completed!");
+sleep(3000);
+
+print('\n🚗 Initializing Shard 2 (Vehicles - All Locations)...');
+try {
+    const shard2Config = {
+        _id: 'shard2ReplSet',
+        members: [
+            { _id: 0, host: 'mongo-shard2:27022' }
+        ]
+    };
+    const conn2 = new Mongo('mongo-shard2:27022');
+    const result2 = conn2.getDB('admin').runCommand({ replSetInitiate: shard2Config });
+    
+    if (result2.ok === 1) {
+        print('✅ Shard 2 (Vehicles) initialized successfully');
+    } else {
+        print('⚠️ Shard 2 response:', JSON.stringify(result2));
+    }
+} catch (error) {
+    print('❌ Error initializing Shard 2:', error.message);
+}
+
+sleep(3000);
+
+print('\n📅 Initializing Shard 3 (Bookings)...');
+try {
+    const shard3Config = {
+        _id: 'shard3ReplSet',
+        members: [
+            { _id: 0, host: 'mongo-shard3:27023' }
+        ]
+    };
+    const conn3 = new Mongo('mongo-shard3:27023');
+    const result3 = conn3.getDB('admin').runCommand({ replSetInitiate: shard3Config });
+    
+    if (result3.ok === 1) {
+        print('✅ Shard 3 (Bookings) initialized successfully');
+    } else {
+        print('⚠️ Shard 3 response:', JSON.stringify(result3));
+    }
+} catch (error) {
+    print('❌ Error initializing Shard 3:', error.message);
+}
+
+sleep(3000);
+
+print('\n💳 Initializing Shard 4 (Payments)...');
+try {
+    const shard4Config = {
+        _id: 'shard4ReplSet',
+        members: [
+            { _id: 0, host: 'mongo-shard4:27024' }
+        ]
+    };
+    const conn4 = new Mongo('mongo-shard4:27024');
+    const result4 = conn4.getDB('admin').runCommand({ replSetInitiate: shard4Config });
+    
+    if (result4.ok === 1) {
+        print('✅ Shard 4 (Payments) initialized successfully');
+    } else {
+        print('⚠️ Shard 4 response:', JSON.stringify(result4));
+    }
+} catch (error) {
+    print('❌ Error initializing Shard 4:', error.message);
+}
+
+print('\n✅ All shard replica sets initialized!');

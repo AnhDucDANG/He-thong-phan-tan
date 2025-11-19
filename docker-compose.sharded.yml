@@ -61,11 +61,7 @@ services:
         condition: service_completed_successfully
       mongo-shard1:
         condition: service_healthy
-      mongo-shard2a:
-        condition: service_healthy
-      mongo-shard2b:
-        condition: service_healthy
-      mongo-shard2c:
+      mongo-shard2:
         condition: service_healthy
       mongo-shard3:
         condition: service_healthy
@@ -96,8 +92,8 @@ services:
 
   # ==================== SHARDS ====================
   # ==================== SHARD 1: USERS ====================
-  # Functional Sharding: Shard chuyên cho Users
-  # Hash Sharding: Phân đều theo _id
+  # Functional Sharding: User data
+  # Hash Sharding: Distributed by _id
   mongo-shard1:
     image: mongo:6.0
     container_name: mongo-shard1-users
@@ -117,18 +113,19 @@ services:
       retries: 10
       start_period: 40s
 
-  # ==================== SHARD 2A: VEHICLES HANOI ====================
-  # Functional + Geographic Sharding: Xe ở Hà Nội
-  mongo-shard2a:
+  # ==================== SHARD 2: VEHICLES ====================
+  # Functional Sharding: Vehicle data (ALL locations)
+  # Hash Sharding: Distributed by vehicle_id
+  mongo-shard2:
     image: mongo:6.0
-    container_name: mongo-shard2a-vehicles-hanoi
+    container_name: mongo-shard2-vehicles
     restart: unless-stopped
-    command: mongod --shardsvr --replSet shard2aReplSet --port 27022 --bind_ip_all
+    command: mongod --shardsvr --replSet shard2ReplSet --port 27022 --bind_ip_all
     ports:
       - "27022:27022"
       - "${MY_TAILSCALE_IP}:27022:27022"
     volumes:
-      - mongo_shard2a_data:/data/db
+      - mongo_shard2_data:/data/db
     networks:
       - rental-network
     healthcheck:
@@ -138,18 +135,19 @@ services:
       retries: 10
       start_period: 40s
 
-  # ==================== SHARD 2B: VEHICLES HCM ====================
-  # Functional + Geographic Sharding: Xe ở HCM
-  mongo-shard2b:
+  # ==================== SHARD 3: BOOKINGS ====================
+  # Functional Sharding: Booking data
+  # Hash Sharding: Distributed by user_id
+  mongo-shard3:
     image: mongo:6.0
-    container_name: mongo-shard2b-vehicles-hcm
+    container_name: mongo-shard3-bookings
     restart: unless-stopped
-    command: mongod --shardsvr --replSet shard2bReplSet --port 27023 --bind_ip_all
+    command: mongod --shardsvr --replSet shard3ReplSet --port 27023 --bind_ip_all
     ports:
       - "27023:27023"
       - "${MY_TAILSCALE_IP}:27023:27023"
     volumes:
-      - mongo_shard2b_data:/data/db
+      - mongo_shard3_data:/data/db
     networks:
       - rental-network
     healthcheck:
@@ -159,64 +157,23 @@ services:
       retries: 10
       start_period: 40s
 
-  # ==================== SHARD 2C: VEHICLES DANANG ====================
-  # Functional + Geographic Sharding: Xe ở Đà Nẵng
-  mongo-shard2c:
-    image: mongo:6.0
-    container_name: mongo-shard2c-vehicles-danang
-    restart: unless-stopped
-    command: mongod --shardsvr --replSet shard2cReplSet --port 27024 --bind_ip_all
-    ports:
-      - "27024:27024"
-      - "${MY_TAILSCALE_IP}:27024:27024"
-    volumes:
-      - mongo_shard2c_data:/data/db
-    networks:
-      - rental-network
-    healthcheck:
-      test: ["CMD", "mongosh", "--port", "27024", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 40s
-
-  # ==================== SHARD 3: BOOKINGS ====================
-  # Functional + Hash Sharding: Booking được hash theo user_id
-  mongo-shard3:
-    image: mongo:6.0
-    container_name: mongo-shard3-bookings
-    restart: unless-stopped
-    command: mongod --shardsvr --replSet shard3ReplSet --port 27025 --bind_ip_all
-    ports:
-      - "27025:27025"
-      - "${MY_TAILSCALE_IP}:27025:27025"
-    volumes:
-      - mongo_shard3_data:/data/db
-    networks:
-      - rental-network
-    healthcheck:
-      test: ["CMD", "mongosh", "--port", "27025", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 40s
-
   # ==================== SHARD 4: PAYMENTS ====================
-  # Functional Sharding: Shard chuyên cho Payments
+  # Functional Sharding: Payment data
+  # Hash Sharding: Distributed by payment_id
   mongo-shard4:
     image: mongo:6.0
     container_name: mongo-shard4-payments
     restart: unless-stopped
-    command: mongod --shardsvr --replSet shard4ReplSet --port 27026 --bind_ip_all
+    command: mongod --shardsvr --replSet shard4ReplSet --port 27024 --bind_ip_all
     ports:
-      - "27026:27026"
-      - "${MY_TAILSCALE_IP}:27026:27026"
+      - "27024:27024"
+      - "${MY_TAILSCALE_IP}:27024:27024"
     volumes:
       - mongo_shard4_data:/data/db
     networks:
       - rental-network
     healthcheck:
-      test: ["CMD", "mongosh", "--port", "27026", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongosh", "--port", "27024", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -343,9 +300,7 @@ services:
 volumes:
   mongo_config_data:
   mongo_shard1_data:
-  mongo_shard2a_data:
-  mongo_shard2b_data:
-  mongo_shard2c_data:
+  mongo_shard2_data:
   mongo_shard3_data:
   mongo_shard4_data:
 
