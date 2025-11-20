@@ -9,7 +9,7 @@ def create_app():
 
     @app.route('/')
     def index():
-        return "✅ Payment Service connected to SQL Server successfully!"
+        return "✅ Payment Service connected to Mongodb successfully!"
 
     return app
 
