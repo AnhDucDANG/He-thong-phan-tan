@@ -1,6 +1,7 @@
 // vehicle-service/controllers/vehicleController.js
 
 const Vehicle = require('../models/Vehicle');
+const userService = require('../services/userService');
 const USER_SERVICE_URL = process.env.USER_SERVICE_URL;
 const axios = require('axios');
 
@@ -9,11 +10,17 @@ const axios = require('axios');
 // 1. Lấy tất cả phương tiện
 exports.getAllVehicles = async (req, res) => {
     try {
-        const vehicles = await Vehicle.find();
-        res.status(200).json(vehicles);
-    } catch (error) {
-        res.status(500).json({ message: 'Error retrieving vehicles', error });
-    }
+    const { status, make } = req.query;
+    const filter = {};
+    
+    if (status) filter.status = status;
+    if (make) filter.make = make;
+
+    const vehicles = await Vehicle.find(filter).sort({ createdAt: -1 });
+    res.status(200).json(vehicles);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 // 2. Tạo phương tiện mới (Create)
@@ -77,29 +84,22 @@ exports.getVehicleById = async (req, res) => {
 // 4. Cập nhật phương tiện (Update)
 exports.updateVehicle = async (req, res) => {
     try {
-        const updatedVehicle = await Vehicle.findByIdAndUpdate(
-            req.params.id,
-            req.body,
-            { new: true, runValidators: true }
-        );
-        if (!updatedVehicle) {
-            return res.status(404).json({ message: 'Vehicle not found' });
-        }
-        res.status(200).json(updatedVehicle);
-    } catch (error) {
-        res.status(400).json({ message: 'Error updating vehicle', error });
-    }
+    const vehicle = await Vehicle.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!vehicle) return res.status(404).json({ message: 'Vehicle not found' });
+    res.status(200).json(vehicle);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 // 5. Xóa phương tiện (Delete)
 exports.deleteVehicle = async (req, res) => {
     try {
-        const deletedVehicle = await Vehicle.findByIdAndDelete(req.params.id);
-        if (!deletedVehicle) {
-            return res.status(404).json({ message: 'Vehicle not found' });
-        }
-        res.status(200).json({ message: 'Vehicle successfully deleted' });
-    } catch (error) {
-        res.status(500).json({ message: 'Error deleting vehicle', error });
-    }
+    // Không xóa thật, chỉ update cờ isDeleted
+    const vehicle = await Vehicle.findByIdAndUpdate(req.params.id, { isDeleted: true }, { new: true });
+    if (!vehicle) return res.status(404).json({ message: 'Vehicle not found' });
+    res.status(200).json({ message: 'Vehicle deleted successfully (Soft delete)' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
