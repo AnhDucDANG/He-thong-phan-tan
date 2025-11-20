@@ -1,5 +1,6 @@
 import os
 import urllib.parse
+from pydantic_settings import BaseSettings
 
 class Settings:
     # Service host/port (tương thích với .env: SERVICE_HOST, SERVICE_PORT)
@@ -19,18 +20,19 @@ class Settings:
     ALGORITHM = os.getenv("ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
-    # Database: nếu có SQLALCHEMY_DATABASE_URL thì dùng trực tiếp, nếu không xây dựng từ các biến DB_*
-    SQLALCHEMY_DATABASE_URL = os.getenv("SQLALCHEMY_DATABASE_URL")
-    if not SQLALCHEMY_DATABASE_URL:
-        DB_USER = os.getenv("DB_USER", "sa")
-        DB_PASSWORD = os.getenv("DB_PASSWORD", os.getenv("SA_PASSWORD", "Lyly2505"))
-        DB_HOST = os.getenv("DB_HOST", "db-booking")
-        DB_PORT = os.getenv("DB_PORT", "1433")
-        DB_NAME = os.getenv("SQL_DB", os.getenv("DB_NAME", "rental_user_db"))
-        # escape driver string
-        DB_DRIVER = urllib.parse.quote_plus(os.getenv("DB_DRIVER", "ODBC Driver 17 for SQL Server"))
-        SQLALCHEMY_DATABASE_URL = f"mssql+pyodbc://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}?driver={DB_DRIVER}"
-
+    MONGO_URL = os.getenv("MONGO_URL")
+    if not MONGO_URL:
+        MONGO_USER = os.getenv("MONGO_USER", "appUser")
+        MONGO_PASSWORD = os.getenv("MONGO_PASSWORD", "Lyly250502")
+        MONGO_HOST = os.getenv("MONGO_HOST", "db-booking")
+        MONGO_PORT = os.getenv("MONGO_PORT", "27017")
+        MONGO_DB = os.getenv("MONGO_DB", "BookingCar")
+        
+        # Tạo URL cơ bản
+        MONGO_USER_QUOTED = urllib.parse.quote_plus(MONGO_USER)
+        MONGO_PASSWORD_QUOTED = urllib.parse.quote_plus(MONGO_PASSWORD)
+        MONGO_URL = f"mongodb://{MONGO_USER_QUOTED}:{MONGO_PASSWORD_QUOTED}@{MONGO_HOST}:{MONGO_PORT}/{MONGO_DB}?authSource=admin"
+    
     SERVICE_MAP = {
         "users": USER_SERVICE_URL,
         "vehicles": VEHICLE_SERVICE_URL,

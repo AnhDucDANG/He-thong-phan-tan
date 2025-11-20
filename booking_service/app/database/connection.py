@@ -1,33 +1,20 @@
-import os
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker, declarative_base
+from motor.motor_asyncio import AsyncIOMotorClient
+from beanie import init_beanie
 from app.core.config import settings
+from app.models.booking_model import Booking
 
-# Tạo engine từ URL trong settings
-engine = create_engine(
-    settings.SQLALCHEMY_DATABASE_URL,
-    pool_pre_ping=True,
-)
+client = None
+db = None
 
-# Session factory
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+async def init_db():
+    global client, db
+    client = AsyncIOMotorClient(settings.MONGO_URL)
+    db = client.get_default_database()
+    await init_beanie(
+        database=db,
+        document_models=[Booking]
+    )
 
-# Declarative base cho models
-Base = declarative_base()
-
-
-def get_db():
-    """Dependency: yield db session"""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-def create_tables():
-    """Tạo các bảng (Base.metadata.create_all)"""
-    try:
-        Base.metadata.create_all(bind=engine)
-    except Exception as e:
-        print(f"Warning: Could not create tables: {e}")
+async def close_db():
+    if client:
+        client.close()

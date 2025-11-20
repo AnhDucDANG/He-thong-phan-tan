@@ -1,13 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
-# import datetime # Đã xóa
 from ..schemas.booking_schema import BookingCreate, BookingResponse
-# from app.core.config import settings # Không cần thiết ở đây nữa
+from ..services.booking_service import save_booking
 
-router = APIRouter()
+router = APIRouter(prefix="/bookings", tags=["bookings"])
 
-# Api tạo đơn hàng
-@router.post("/bookings", response_model=BookingResponse, status_code=201)
-def create_booking(booking_data: BookingCreate):
+# Api tạo đơn đặt xe
+@router.post("/", response_model=BookingResponse, status_code=201)
+async def create_booking(booking_data: BookingCreate):
     # b1: gọi User service
     # user_verified = user_service.verify_license(booking_data.user_id)
     # if not user_verified:
@@ -23,23 +22,56 @@ def create_booking(booking_data: BookingCreate):
     
     # b4: gọi Payment service
     # payment_status = payment_service.process_payment(total_amount)
-    
+    #try:
+    #    booking_data.user_id = int(booking_data.user_id)
+    #except (ValueError, TypeError):
+    #    raise HTTPException(
+    #        status_code=400,
+    #        detail="user_id must be a valid integer"
+    #   )
+
+    total_amount = 2500000 
+    payment_status = "CONFIRMED"
+
     # b5: lưu vào DB
     # booking_id = database.save_booking(booking_data, payment_status)
     # car_service.mark_car_as_booked(booking_data.car_id, booking_id)
+    try:
+        db_booking = await save_booking(booking_data, payment_status, total_amount)
+        
+    except ValueError as e:
+        # Lỗi validation (user_id, car_id không hợp lệ)
+        raise HTTPException(status_code=400, detail=f"Validation Error: {str(e)}")
     
-    return {"booking_id": "MOCK-BKG-001", "status": "CONFIRMED"}
+    except Exception as e:
+        # Lỗi xung đột dữ liệu (Concurrency conflict) hoặc lỗi CSDL
+        error_msg = str(e).lower()
+        if "already reserved" in error_msg or "concurrency" in error_msg:
+            raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+    
+    return BookingResponse(
+        id=str(db_booking.id),
+        user_id=db_booking.user_id,
+        car_id=db_booking.car_id,
+        start_date=db_booking.start_date,
+        end_date=db_booking.end_date,
+        book_price=db_booking.book_price,
+        daily_rate=db_booking.daily_rate,         
+        total_days=db_booking.total_days,         
+        status=db_booking.status.lower(),
+        created_at=db_booking.created_at,
+        updated_at=db_booking.updated_at,
+    )
 
 # Api xem Booking
-@router.get("/bookings/{id}", response_model=BookingResponse)
-def get_booking_details(id: str):
-    return {"booking_id": id, "status": "CONFIRMED"}
+@router.get("/{booking_id}", response_model=BookingResponse)
+async def get_booking_details(booking_id: str):
+    # TODO: implement thật sau
+    return {"id": booking_id, "status": "CONFIRMED"}
 
 # Api hủy Booking
-@router.post("/bookings/{id}/cancel")
-def cancel_booking(id: str):
-    # Gọi Car Service để giải phóng xe
-    # car_service.release_car(id)
-    return {"message": f"Booking {id} cancelled successfully"}
-
-# Hàm health đã được chuyển sang app/routes/health_routes.py
+@router.post("/{booking_id}/cancel")
+async def cancel_booking(booking_id: str):
+    # TODO: implement thật sau
+    return {"message": f"Booking {booking_id} cancelled successfully"}

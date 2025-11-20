@@ -1,23 +1,16 @@
-# Single-stage image cho đơn giản và đáng tin cậy
 FROM python:3.10-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /app
 
-# Cài các công cụ hệ thống cần thiết
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ca-certificates gnupg2 apt-transport-https lsb-release build-essential \
-    unixodbc-dev \
+    curl ca-certificates gnupg2 apt-transport-https lsb-release \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Thêm key Microsoft và repository theo cách an toàn (gpg --dearmor)
-RUN curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /usr/share/keyrings/microsoft.gpg \
- && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/debian/11/prod bullseye main" > /etc/apt/sources.list.d/mssql-release.list \
- && apt-get update \
- && ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql17 \
- && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements và cài Python deps
+# Đây là nơi motor và beanie sẽ được cài đặt từ requirements.txt
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
@@ -27,7 +20,7 @@ COPY . /app
 # Expose port
 EXPOSE 8003
 
-# Healthcheck (yêu cầu curl trong image)
+# Healthcheck
 HEALTHCHECK --interval=15s --timeout=5s --retries=3 \
   CMD curl -f http://localhost:8003/api/v1/health || exit 1
 

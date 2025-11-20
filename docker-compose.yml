@@ -1,33 +1,25 @@
-
 services:
   db-booking:
-    image: mcr.microsoft.com/mssql/server:2019-latest
-    container_name: BookingCar
+    image: mongo:8.2
+    container_name: MongoDB
     environment:
-      SA_PASSWORD: "Lyly2505"
-      ACCEPT_EULA: "Y"
-      SECRET_KEY: "dZ4ZkH8kN0WGD9CLOl-A2S0WVTIsAqwhLcixybLBAPA"
-      ALGORITHM: "HS256"
-    healthcheck:
-      test: ["CMD", "grep", "-q", "Recovery is complete", "/var/opt/mssql/log/errorlog"]
-      interval: 10s
-      timeout: 5s
-      retries: 30 # Tăng retries để đợi lâu hơn
-      start_period: 120s # Thời gian khởi tạo ban đầu
+      # Cấu hình user/pass cơ bản cho MongoDB
+      MONGO_INITDB_ROOT_USERNAME: appUser
+      MONGO_INITDB_ROOT_PASSWORD: Lyly250502
+      MONGO_INITDB_DATABASE: BookingCar
     ports:
-      - "1433:1433"
-    # dùng named volume, KHÔNG bind mount tới root hoặc thư mục không hợp lệ
+      - "27017:27017"
     volumes:
-      - sqlserver_booking_data:/var/opt/mssql
+      - mongodb_booking_data:/data/db
     restart: unless-stopped
     networks:
       - rental-network
-    # (Tuỳ chọn) thêm healthcheck cho SQL Server nếu image hỗ trợ công cụ kiểm tra
-    # healthcheck:
-    #   test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P \"$SA_PASSWORD\" -Q \"SELECT 1\" || exit 1"]
-    #   interval: 30s
-    #   timeout: 10s
-    #   retries: 5
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"] # Health check cơ bản
+      interval: 5s
+      timeout: 2s
+      retries: 5
+      start_period: 20s
 
   booking_service:
     build:
@@ -37,13 +29,8 @@ services:
     restart: unless-stopped
     ports:
       - "8003:8003"
-    environment:
-      - SQL_DB=BookingCar
-      - SECRET_KEY=${SECRET_KEY}
-      - ALGORITHM=${ALGORITHM}
-      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
-      - DB_HOST=db-booking
-      - DB_PORT=1433
+    env_file:               
+      - ./.env
     depends_on:
       db-booking:
         condition: service_healthy
@@ -56,7 +43,7 @@ services:
       retries: 5
 
 volumes:
-  sqlserver_booking_data:
+  mongodb_booking_data:
     driver: local
 
 networks:

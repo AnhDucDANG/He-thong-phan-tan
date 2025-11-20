@@ -2,6 +2,8 @@ from fastapi import APIRouter
 import datetime
 from app.core.config import settings
 from typing import Dict, Any, Union
+from motor.motor_asyncio import AsyncIOMotorClient 
+import asyncio
 
 router = APIRouter()
 
@@ -17,20 +19,29 @@ async def health(check_db: bool = False) -> Dict[str, Union[str, bool, Dict]]:
         "time": datetime.datetime.utcnow().isoformat() + "Z",
     }
 
-    # Logic kiểm tra kết nối DB (giữ nguyên từ code cũ)
     if check_db:
+        client = None
+        
         try:
-            # Lưu ý: Cần đảm bảo thư viện sqlalchemy đã được cài đặt (trong requirements.txt)
-            from sqlalchemy import create_engine, text
-
-            # Sử dụng config từ app.core.config
-            engine = create_engine(settings.SQLALCHEMY_DATABASE_URL, connect_args={"timeout": 5})
-            with engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
+            # Khởi tạo Async Motor Client từ MONGO_URL
+            client = AsyncIOMotorClient(
+                settings.MONGO_URL, 
+                serverSelectionTimeoutMS=5000 # 5 giây timeout
+            )
+            
+            # Thực hiện lệnh ping (kiểm tra server có phản hồi không)
+            # await là bắt buộc khi dùng Motor
+            await client.admin.command('ping')
+            
             result["database"] = "ok"
+
         except Exception as e:
             result["database"] = "error"
             result["db_error"] = str(e)
             result["status"] = "degraded"
+        
+        finally:
+            if client:
+                 client.close()
 
     return result

@@ -69,7 +69,7 @@ class BookingStatusUpdate(BaseModel):
 class BookingResponse(BookingBase):
     """Schema for the booking object returned by the API."""
     
-    id: int
+    id: str = Field(..., description="MongoDB ObjectId as string")
     
     book_price: float = Field(..., description="Final calculated price of the booking.")
     
@@ -86,7 +86,7 @@ class BookingResponse(BookingBase):
         from_attributes = True
         json_schema_extra = {
             "example": {
-                "id": 15,
+                "id": "15",
                 "user_id": 101,
                 "car_id": "CAR-ABC-123",
                 "pickup_location": "Sân bay Tân Sơn Nhất",
@@ -101,3 +101,4 @@ class BookingResponse(BookingBase):
                 "updated_at": "2025-11-20T16:00:00"
             }
         }
+        populate_by_name = True
