@@ -47,7 +47,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         )
     
     users_collection = get_users_collection()
-    user = users_collection.find_one({"email": email, "is_deleted": False})
+    user = await users_collection.find_one({"email": email, "is_deleted": False})
     
     if user is None:
         raise HTTPException(
@@ -213,7 +213,7 @@ async def verify_email(data: VerifyEmail):
     logger.info(f"📧 Email verification attempt")
     
     users_collection = get_users_collection()
-    user = users_collection.find_one({
+    user = await users_collection.find_one({
         "email_verification_token": data.token,
         "is_deleted": False
     })
@@ -233,7 +233,7 @@ async def verify_email(data: VerifyEmail):
             detail="Verification token has expired"
         )
     
-    users_collection.update_one(
+    await users_collection.update_one(
         {"_id": user["_id"]},
         {
             "$set": {
@@ -278,12 +278,12 @@ async def update_current_user(
     if user_update.avatar_url is not None:
         update_data["avatar_url"] = user_update.avatar_url
     
-    users_collection.update_one(
+    await users_collection.update_one(
         {"_id": current_user["_id"]},
         {"$set": update_data}
     )
     
-    updated_user = users_collection.find_one({"_id": current_user["_id"]})
+    updated_user = await users_collection.find_one({"_id": current_user["_id"]})
     updated_user["_id"] = str(updated_user["_id"])
     
     logger.info(f"✅ Profile updated for: {current_user['email']}")
@@ -305,7 +305,7 @@ async def change_password(
         )
     
     users_collection = get_users_collection()
-    users_collection.update_one(
+    await users_collection.update_one(
         {"_id": current_user["_id"]},
         {
             "$set": {
@@ -325,7 +325,7 @@ async def forgot_password(data: ForgotPassword):
     logger.info(f"🔐 Password reset request for: {data.email}")
     
     users_collection = get_users_collection()
-    user = users_collection.find_one({
+    user = await users_collection.find_one({
         "email": data.email,
         "is_deleted": False
     })
@@ -336,7 +336,7 @@ async def forgot_password(data: ForgotPassword):
     reset_token = generate_verification_token()
     reset_expires = create_verification_token_expiry(settings.PASSWORD_RESET_EXPIRE_HOURS)
     
-    users_collection.update_one(
+    await users_collection.update_one(
         {"_id": user["_id"]},
         {
             "$set": {
@@ -360,7 +360,7 @@ async def reset_password(data: ResetPassword):
     logger.info(f"🔄 Password reset attempt")
     
     users_collection = get_users_collection()
-    user = users_collection.find_one({
+    user = await users_collection.find_one({
         "reset_password_token": data.token,
         "is_deleted": False
     })
@@ -377,7 +377,7 @@ async def reset_password(data: ResetPassword):
             detail="Reset token has expired"
         )
     
-    users_collection.update_one(
+    await users_collection.update_one(
         {"_id": user["_id"]},
         {
             "$set": {
@@ -401,16 +401,16 @@ async def get_user_stats(admin_user: dict = Depends(get_current_admin)):
     
     users_collection = get_users_collection()
     
-    total_users = users_collection.count_documents({"is_deleted": False})
-    verified_users = users_collection.count_documents({
+    total_users = await users_collection.count_documents({"is_deleted": False})
+    verified_users = await users_collection.count_documents({
         "is_email_verified": True,
         "is_deleted": False
     })
-    customers = users_collection.count_documents({
+    customers = await users_collection.count_documents({
         "role": "customer",
         "is_deleted": False
     })
-    admins = users_collection.count_documents({
+    admins = await users_collection.count_documents({
         "role": "admin",
         "is_deleted": False
     })
@@ -428,7 +428,7 @@ async def delete_account(current_user: dict = Depends(get_current_user)):
     logger.info(f"🗑️ Account deletion request from: {current_user['email']}")
     
     users_collection = get_users_collection()
-    users_collection.update_one(
+    await users_collection.update_one(
         {"_id": current_user["_id"]},
         {
             "$set": {
