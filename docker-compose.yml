@@ -1,0 +1,51 @@
+services:
+  db-booking:
+    image: mongo:8.2
+    container_name: MongoDB
+    environment:
+      # Cấu hình user/pass cơ bản cho MongoDB
+      MONGO_INITDB_ROOT_USERNAME: appUser
+      MONGO_INITDB_ROOT_PASSWORD: Lyly250502
+      MONGO_INITDB_DATABASE: BookingCar
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_booking_data:/data/db
+    restart: unless-stopped
+    networks:
+      - rental-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"] # Health check cơ bản
+      interval: 5s
+      timeout: 2s
+      retries: 5
+      start_period: 20s
+
+  booking_service:
+    build:
+      context: ./booking_service
+      dockerfile: Dockerfile
+    container_name: rental-booking-service
+    restart: unless-stopped
+    ports:
+      - "8003:8003"
+    env_file:               
+      - ./.env
+    depends_on:
+      db-booking:
+        condition: service_healthy
+    networks:
+      - rental-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8003/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mongodb_booking_data:
+    driver: local
+
+networks:
+  rental-network:
+    driver: bridge
