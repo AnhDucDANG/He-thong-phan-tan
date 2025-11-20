@@ -3,8 +3,9 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const connectDB = require('./src/config/database.js'); // Đường dẫn đúng;
-const vehicleRoutes = require('./src/routes/vehicleRoutes');
 require('dotenv').config(); 
+const vehicleRoutes = require('./src/routes/vehicleRoutes');
+
 
 const app = express();
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/vehicle_db';
