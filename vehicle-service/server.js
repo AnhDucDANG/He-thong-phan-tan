@@ -2,9 +2,12 @@
 
 const express = require('express');
 const mongoose = require('mongoose');
+const cors = require('cors');
+const morgan = require('morgan');
 const connectDB = require('./src/config/database.js'); // Đường dẫn đúng;
-const vehicleRoutes = require('./src/routes/vehicleRoutes');
 require('dotenv').config(); 
+const vehicleRoutes = require('./src/routes/vehicleRoutes');
+
 
 const app = express();
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/vehicle_db';
@@ -30,8 +33,15 @@ const PORT = process.env.PORT || 8002;
 // };
 
 // --- 2. Khởi tạo Service ---
+
+// Middleware
+app.use(cors()); // Cho phép Frontend gọi API
 app.use(express.json());
+app.use(morgan('dev')); // Log request ra console
+
+// Routes
 app.use('/api/vehicles', vehicleRoutes);
+
 // Route kiểm tra trạng thái
 app.get('/health', (req, res) => {
     // Lý tưởng là kiểm tra trạng thái kết nối CSDL ở đây

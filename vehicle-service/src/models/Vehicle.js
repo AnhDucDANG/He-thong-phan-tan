@@ -1,9 +1,17 @@
-// vehicle-service/models/Vehicle.js
+
 
 const mongoose = require('mongoose');
 
 const VehicleSchema = new mongoose.Schema({
     // ID xe (MongoDB tự tạo)
+    ownerId: { 
+    type: String, 
+    required: true, 
+    index: true // Tạo index để tìm xe theo chủ nhanh hơn
+    },
+    make: { type: String, required: true },   // Hãng (Toyota)
+    model: { type: String, required: true },  // Dòng (Camry)
+    year: { type: Number, required: true }, // Năm sản xuất
 
     licensePlate: {
         type: String,
@@ -11,12 +19,8 @@ const VehicleSchema = new mongoose.Schema({
         unique: true, // Rất quan trọng: Mỗi xe có 1 biển số duy nhất
         trim: true
     },
-    model: {
-        type: String,
-        required: [true, 'Tên mẫu xe là bắt buộc']
-    },
-    make: String, // Hãng xe (VD: Toyota, Ford)
-    year: Number, // Năm sản xuất
+   
+    
     dailyRate: {
         type: Number,
         required: [true, 'Giá thuê ngày là bắt buộc'],
@@ -27,6 +31,9 @@ const VehicleSchema = new mongoose.Schema({
         enum: ['available', 'on_rent', 'maintenance'], // Các trạng thái có thể có
         default: 'available'
     },
+    description: String,
+    images: [String], // Mảng chứa URL ảnh
+    isDeleted: { type: Boolean, default: false },
     lastUpdated: {
         type: Date,
         default: Date.now

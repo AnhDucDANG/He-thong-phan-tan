@@ -1,4 +1,4 @@
-// src/config/database.js (Mã nguồn bạn đã có, chỉ thêm logging tốt hơn)
+
 const mongoose = require('mongoose');
 
 const connectDB = async () => {

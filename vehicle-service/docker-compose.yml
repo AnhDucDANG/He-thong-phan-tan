@@ -7,7 +7,7 @@ services:
     container_name: mongo_db
     # KHÔNG MỞ CỔNG RA NGOÀI (để tăng bảo mật)
     ports:
-      - "27017:27017" # Chỉ mở cổng nội bộ cho các service khác trong mạng Docker
+      - "27018:27018" # Chỉ mở cổng nội bộ cho các service khác trong mạng Docker
     volumes:
       - mongo_data:/data/db # Lưu trữ dữ liệu
     restart: always
