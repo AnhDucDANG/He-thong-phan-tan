@@ -6,6 +6,7 @@ from app.database import init_db
 from app.routes import health, payments
 from app.config import settings
 
+<<<<<<< HEAD
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -14,6 +15,11 @@ async def lifespan(app: FastAPI):
     yield
     # Shutdown
     print("🛑 Payment Service shutting down")
+=======
+    @app.route('/')
+    def index():
+        return "✅ Payment Service connected to Mongodb successfully!"
+>>>>>>> 506927b6215231efd49f9ca06517d9da0547a5be
 
 app = FastAPI(
     title="Payment Service API",
