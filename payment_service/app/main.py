@@ -1,19 +1,44 @@
-from flask import Flask
-from app.database.connection import init_db
-from app.core.config import Config
-from app.models.payment_model import Payment
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 
-def create_app():
-    app = Flask(__name__)
-    db = init_db(app)
+from app.database import init_db
+from app.routes import health, payments
+from app.config import settings
 
-    @app.route('/')
-    def index():
-        return "✅ Payment Service connected to SQL Server successfully!"
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    await init_db()
+    print("🚀 Payment Service started successfully")
+    yield
+    # Shutdown
+    print("🛑 Payment Service shutting down")
 
-    return app
+app = FastAPI(
+    title="Payment Service API",
+    description="Microservice xử lý thanh toán cho hệ thống Rental Car",
+    version="1.0.0",
+    lifespan=lifespan
+)
 
-app = create_app()
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-if __name__ == "__main__":
-    app.run(host="8.0.0.4", port=Config.FLASK_PORT, debug=True)
+# Include routers
+app.include_router(health.router, prefix="/api/v1", tags=["Health"])
+app.include_router(payments.router, prefix="/api/v1/payments", tags=["Payments"])
+
+@app.get("/")
+async def root():
+    return {
+        "message": "Payment Service is running!",
+        "version": "1.0.0",
+        "docs": "/docs"
+    }
