@@ -1,78 +1,50 @@
-version: '3.8' # Phiên bản cú pháp Docker Compose
+# Docker Compose cho Vehicle Service (Đức)
+# Kết nối đến MongoDB Sharded Cluster của Lâm qua Tailscale
+
+version: '3.8'
 
 services:
-  # 1. CSDL MongoDB (Dữ liệu của Đức - P2)
-  mongo_db:
-    image: mongo:latest
-    container_name: mongo_db
-    # KHÔNG MỞ CỔNG RA NGOÀI (để tăng bảo mật)
-    ports:
-      - "27018:27018" # Chỉ mở cổng nội bộ cho các service khác trong mạng Docker
-    volumes:
-      - mongo_data:/data/db # Lưu trữ dữ liệu
-    restart: always
-
-  # 2. Vehicle Service (Ứng dụng của Đức - P2)
+  # ==================== VEHICLE SERVICE ====================
   vehicle_service:
-    build: . # Xây dựng từ Dockerfile của bạn
-    container_name: vehicle_service
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rental-vehicle-service
+    restart: unless-stopped
+    
+    # Mở port ra ngoài và cho Tailscale
     ports:
-      - "8001:8001" # Mở cổng 8001 ra ngoài cho Frontend/Postman gọi
+      - "8002:8002"
+      - "100.73.22.88:8002:8002"  # Tailscale IP của Đức
+    
+    # Biến môi trường kết nối
     environment:
-      # QUAN TRỌNG: Kết nối MongoDB bằng tên Service
-      MONGO_URI: mongodb://mongo_db:27017/vehicle_db 
-      PORT: 8001
-    depends_on:
-      - mongo_db # Đảm bảo DB khởi động trước
-    # thêm mạng và volume nếu cần
+      # Kết nối đến MongoDB của Lâm qua Tailscale
+      - MONGO_URI=mongodb://100.69.63.99:27017/rental_db
+      - PORT=8002
+      
+      # Tailscale IP của máy Đức
+      - MY_TAILSCALE_IP=100.73.22.88
+      
+      # External Services (qua Tailscale)
+      - USER_SERVICE_URL=http://100.69.63.99:8001
+      - VEHICLE_SERVICE_URL=http://100.73.22.88:8002
+      - BOOKING_SERVICE_URL=http://100.65.117.32:8003
+      - PAYMENT_SERVICE_URL=http://100.108.163.69:8004
+    
+    # Sử dụng network mode host để kết nối Tailscale dễ dàng hơn
+    network_mode: host
+    
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8002/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
-  # # --- Các Services Phân tán khác ---
-
-  # # 3. CSDL PostgreSQL (Dữ liệu của Ly/Hiếu)
-  # postgres_db:
-  #   image: postgres:14-alpine
-  #   container_name: postgres_db
-  #   environment:
-  #     POSTGRES_USER: user
-  #     POSTGRES_PASSWORD: password
-  #     POSTGRES_DB: booking_db
-  #   volumes:
-  #     - pg_data:/var/lib/postgresql/data
-  #   restart: always
-  
-  # # 4. RabbitMQ (Giao tiếp Bất đồng bộ - P1/P3)
-  # rabbitmq:
-  #   image: rabbitmq:3-management
-  #   container_name: rabbitmq
-  #   ports:
-  #     - "15672:15672" # Cổng giao diện quản lý
-  #   restart: always
-  
-  # # 5. Booking Service (Ứng dụng của Ly - P1)
-  # booking_service:
-  #   build: ./booking-service
-  #   container_name: booking_service
-  #   ports:
-  #     - "8000:8000"
-  #   environment:
-  #     DB_HOST: postgres_db
-  #     VEHICLE_SERVICE_URL: http://vehicle_service:8001 # Ly gọi API của bạn!
-  #   depends_on:
-  #     - postgres_db
-  #     - vehicle_service # Phụ thuộc vào Service của bạn
-
-  # # 6. User Auth Service (Ứng dụng của Lâm - P3)
-  # user_service:
-  #   build: ./user-auth-service
-  #   container_name: user_service
-  #   ports:
-  #     - "8002:8002"
-  #   environment:
-  #     DB_HOST: mongo_db # Lâm cũng dùng MongoDB (tùy chọn)
-  #   depends_on:
-  #     - mongo_db
-
-# Định nghĩa Volumes (đảm bảo dữ liệu CSDL được duy trì)
-volumes:
-  mongo_data:
-  pg_data:
+# ==================== LƯU Ý ====================
+# 1. Không cần MongoDB container riêng nữa
+# 2. Kết nối trực tiếp đến MongoDB của Lâm qua Tailscale (100.69.63.99:27017)
+# 3. Đảm bảo Tailscale đã đăng nhập và kết nối
+# 4. Database chung: rental_db
+# 5. Collection: vehicles (trong shard 2)

@@ -3,12 +3,12 @@ fastapi==0.104.1
 uvicorn[standard]==0.24.0
 
 # Validation và serialization
-pydantic[email]==2.9.2          # cập nhật lên mới nhất
+pydantic[email]==2.9.2        
 python-multipart==0.0.6
 
 # Database và ORM
 motor>=3.5.0
-beanie>=2.0.0                   # ← quan trọng: nâng lên >=2.0
+beanie>=2.0.0                   
 python-dotenv==1.0.0
 pydantic-settings>=2.4
 

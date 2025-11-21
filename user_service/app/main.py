@@ -30,16 +30,17 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # In production, specify allowed origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(user_routes.router, tags=["users"])
+# Include routes
+app.include_router(user_routes.router, prefix="", tags=["users"])
 
 @app.get("/")
 async def root():

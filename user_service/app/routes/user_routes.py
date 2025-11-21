@@ -1,13 +1,15 @@
-from fastapi import APIRouter, HTTPException, Depends, status, Header, Form
+from fastapi import APIRouter, HTTPException, Depends, status, Header, Form, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, OAuth2PasswordRequestForm
 from datetime import datetime, timedelta
 import logging
-import secrets  
+import secrets
+from bson import ObjectId
 
 from ..schemas.user_schema import (
     UserRegister, UserLogin, UserResponse, TokenResponse, 
-    UserUpdate, ChangePassword, ForgotPassword, ResetPassword,
-    VerifyEmail, MessageResponse, UserStatsResponse
+    MessageResponse, UserUpdate, ChangePassword, 
+    ForgotPassword, ResetPassword, VerifyEmail,
+    UserStatsResponse, DailySignup
 )
 from ..core.security import (
     verify_password, get_password_hash, create_access_token,
@@ -415,17 +417,23 @@ async def get_user_stats(admin_user: dict = Depends(get_current_admin)):
         "is_deleted": False
     })
     
-    return {
-        "total_users": total_users,
-        "verified_users": verified_users,
-        "customers": customers,
-        "admins": admins
-    }
-
-@router.delete("/me", response_model=MessageResponse)
-async def delete_account(current_user: dict = Depends(get_current_user)):
-    """Soft delete user account"""
-    logger.info(f"🗑️ Account deletion request from: {current_user['email']}")
+    # Get daily signups for last 7 days
+    from datetime import timedelta
+    daily_signups = []
+    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    for i in range(6, -1, -1):  # Last 7 days
+        day_start = today - timedelta(days=i)
+        day_end = day_start + timedelta(days=1)
+        
+        count = await users_collection.count_documents({
+            "created_at": {
+                "$gte": day_start,
+                "$lt": day_end
+            },
+            "is_deleted": False
+        })
+        
     
     users_collection = get_users_collection()
     await users_collection.update_one(
@@ -443,9 +451,99 @@ async def delete_account(current_user: dict = Depends(get_current_user)):
     
     return {"message": "Account deleted successfully"}
 
-# ==================== SHARDING ENDPOINTS ====================
+# ==================== ADMIN USER MANAGEMENT ====================
 
-@router.get("/sharding/status", response_model=dict)
+@router.get("/users", response_model=list[UserResponse])
+async def get_all_users(admin_user: dict = Depends(get_current_admin)):
+    """Get all users (Admin only)"""
+    users_collection = get_users_collection()
+    users_cursor = users_collection.find({"is_deleted": False})
+    users = await users_cursor.to_list(length=None)
+    
+    # Convert _id to string
+    for user in users:
+        user["_id"] = str(user["_id"])
+        
+    return users
+
+@router.get("/users/{user_id}", response_model=UserResponse)
+async def get_user_by_id(
+    user_id: str,
+    admin_user: dict = Depends(get_current_admin)
+):
+    """Get user by ID (Admin only)"""
+    if not ObjectId.is_valid(user_id):
+        raise HTTPException(status_code=400, detail="Invalid user ID")
+        
+    users_collection = get_users_collection()
+    user = await users_collection.find_one({"_id": ObjectId(user_id), "is_deleted": False})
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    user["_id"] = str(user["_id"])
+    return user
+
+@router.put("/users/{user_id}", response_model=UserResponse)
+async def update_user_by_admin(
+    user_id: str,
+    user_update: UserUpdate,
+    admin_user: dict = Depends(get_current_admin)
+):
+    """Update user by ID (Admin only)"""
+    if not ObjectId.is_valid(user_id):
+        raise HTTPException(status_code=400, detail="Invalid user ID")
+        
+    users_collection = get_users_collection()
+    
+    # Check if user exists
+    existing_user = await users_collection.find_one({"_id": ObjectId(user_id), "is_deleted": False})
+    if not existing_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    update_data = {"updated_at": datetime.utcnow()}
+    
+    if user_update.full_name is not None:
+        update_data["full_name"] = user_update.full_name
+    if user_update.phone is not None:
+        update_data["phone"] = user_update.phone
+    if user_update.address is not None:
+        update_data["address"] = user_update.address
+    if user_update.avatar_url is not None:
+        update_data["avatar_url"] = user_update.avatar_url
+        
+    await users_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": update_data}
+    )
+    
+    updated_user = await users_collection.find_one({"_id": ObjectId(user_id)})
+    updated_user["_id"] = str(updated_user["_id"])
+    
+    return updated_user
+
+@router.delete("/users/{user_id}", response_model=MessageResponse)
+async def delete_user_by_admin(
+    user_id: str,
+    admin_user: dict = Depends(get_current_admin)
+):
+    """Delete user by ID (Admin only)"""
+    if not ObjectId.is_valid(user_id):
+        raise HTTPException(status_code=400, detail="Invalid user ID")
+        
+    users_collection = get_users_collection()
+    
+    result = await users_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {
+            "$set": {
+                "is_deleted": True,
+                "is_active": False,
+                "updated_at": datetime.utcnow()
+            }
+        }
+    )
+    
 async def get_sharding_status():
     """Get detailed sharding information"""
     from ..database.connection import get_database, client

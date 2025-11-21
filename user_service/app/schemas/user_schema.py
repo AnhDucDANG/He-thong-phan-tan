@@ -118,9 +118,15 @@ class MessageResponse(BaseModel):
     message: str
 
 
+class DailySignup(BaseModel):
+    date: str
+    count: int
+
+
 class UserStatsResponse(BaseModel):
     """Schema for user statistics"""
     total_users: int
     verified_users: int
     customers: int
     admins: int
+    daily_signups: list[DailySignup]
