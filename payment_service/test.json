@@ -1,7 +1,8 @@
 {
   "info": {
-    "name": "Payment Service API",
+    "name": "Payment Service",
     "_postman_id": "payment-service-collection",
+    "description": "Collection for Payment Service APIs (CRUD + VNPay)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -10,83 +11,164 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": { "raw": "http://localhost:8004/api/health", "protocol": "http", "host": ["localhost"], "port": "8004", "path": ["api","health"] }
-      }
+        "url": {
+          "raw": "http://localhost:8004/api/health",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8004",
+          "path": ["api", "health"]
+        }
+      },
+      "response": []
     },
     {
       "name": "Create Payment",
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [{"key": "Content-Type","value": "application/json"}],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"booking_id\": \"BK123\",\n  \"user_id\": \"USER123\",\n  \"amount\": 500000\n}"
+          "raw": "{\n  \"booking_id\": \"booking123\",\n  \"user_id\": \"user123\",\n  \"amount\": 500000\n}"
         },
-        "url": { "raw": "http://localhost:8004/api/payments", "protocol": "http", "host": ["localhost"], "port": "8004", "path": ["api","payments"] }
-      }
+        "url": {
+          "raw": "http://localhost:8004/api/payments",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8004",
+          "path": ["api", "payments"]
+        }
+      },
+      "response": []
     },
     {
       "name": "Get All Payments",
       "request": {
         "method": "GET",
-        "url": { "raw": "http://localhost:8004/api/payments", "protocol": "http", "host": ["localhost"], "port": "8004", "path": ["api","payments"] }
-      }
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8004/api/payments",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8004",
+          "path": ["api", "payments"]
+        }
+      },
+      "response": []
     },
     {
-      "name": "Get Payments by User",
+      "name": "Get Payments By User",
       "request": {
         "method": "GET",
-        "url": { "raw": "http://localhost:8004/api/payments/user/USER123", "protocol": "http", "host": ["localhost"], "port": "8004", "path": ["api","payments","user","USER123"] }
-      }
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8004/api/payments/user/user123",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8004",
+          "path": ["api", "payments", "user", "user123"]
+        }
+      },
+      "response": []
     },
     {
-      "name": "Get Payment by ID",
+      "name": "Get Payment Detail",
       "request": {
         "method": "GET",
-        "url": { "raw": "http://localhost:8004/api/payments/{{payment_id}}", "protocol": "http", "host": ["localhost"], "port": "8004", "path": ["api","payments","{{payment_id}}"] }
-      }
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8004/api/payments/{{payment_id}}",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8004",
+          "path": ["api", "payments", "{{payment_id}}"]
+        }
+      },
+      "response": []
     },
     {
       "name": "Update Payment",
       "request": {
         "method": "PUT",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": { "mode": "raw", "raw": "{\n  \"payment_status\": \"completed\"\n}" },
-        "url": { "raw": "http://localhost:8004/api/payments/{{payment_id}}", "protocol": "http", "host": ["localhost"], "port": "8004", "path": ["api","payments","{{payment_id}}"] }
-      }
+        "header": [{"key": "Content-Type","value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"payment_status\": \"completed\",\n  \"gateway_transaction_id\": \"VNPAY_123456\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8004/api/payments/{{payment_id}}",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8004",
+          "path": ["api", "payments", "{{payment_id}}"]
+        }
+      },
+      "response": []
     },
     {
       "name": "Delete Payment",
       "request": {
         "method": "DELETE",
-        "url": { "raw": "http://localhost:8004/api/payments/{{payment_id}}", "protocol": "http", "host": ["localhost"], "port": "8004", "path": ["api","payments","{{payment_id}}"] }
-      }
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8004/api/payments/{{payment_id}}",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8004",
+          "path": ["api", "payments", "{{payment_id}}"]
+        }
+      },
+      "response": []
     },
     {
       "name": "Create VNPay Payment",
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [{"key": "Content-Type","value": "application/json"}],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"booking_id\": \"BK123\",\n  \"user_id\": \"USER123\",\n  \"amount\": 500000\n}"
+          "raw": "{\n  \"booking_id\": \"booking123\",\n  \"user_id\": \"user123\",\n  \"amount\": 500000\n}"
         },
-        "url": { "raw": "http://localhost:8004/api/payments/vnpay/create", "protocol": "http", "host": ["localhost"], "port": "8004", "path": ["api","payments","vnpay","create"] }
-      }
+        "url": {
+          "raw": "http://localhost:8004/api/payments/vnpay/create",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8004",
+          "path": ["api", "payments", "vnpay", "create"]
+        }
+      },
+      "response": []
     },
     {
-      "name": "VNPay Return URL (simulate GET)",
+      "name": "VNPay Return",
       "request": {
         "method": "GET",
-        "url": { "raw": "http://localhost:8004/api/payments/vnpay/return?vnp_TxnRef=BK123&vnp_ResponseCode=00&vnp_TransactionNo=VNPAY123&vnp_SecureHash=XXXX", "protocol": "http", "host": ["localhost"], "port": "8004", "path": ["api","payments","vnpay","return"] }
-      }
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8004/api/payments/vnpay/return?vnp_ResponseCode=00",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8004",
+          "path": ["api", "payments", "vnpay", "return"],
+          "query": [{"key":"vnp_ResponseCode","value":"00"}]
+        }
+      },
+      "response": []
     },
     {
-      "name": "VNPay IPN URL (simulate GET)",
+      "name": "VNPay IPN",
       "request": {
         "method": "GET",
-        "url": { "raw": "http://localhost:8004/api/payments/vnpay/ipn?vnp_TxnRef=BK123&vnp_ResponseCode=00&vnp_TransactionNo=VNPAY123&vnp_SecureHash=XXXX", "protocol": "http", "host": ["localhost"], "port": "8004", "path": ["api","payments","vnpay","ipn"] }
-      }
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8004/api/payments/vnpay/ipn?vnp_ResponseCode=00",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8004",
+          "path": ["api", "payments", "vnpay", "ipn"],
+          "query": [{"key":"vnp_ResponseCode","value":"00"}]
+        }
+      },
+      "response": []
     }
   ]
 }
