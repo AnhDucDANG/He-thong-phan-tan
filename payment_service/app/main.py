@@ -1,50 +1,20 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
+from app.database.connection import init_db, close_db
+from app.routes.payment_routes import router as payment_router
 
-from app.database import init_db
-from app.routes import health, payments
-from app.config import settings
+app = FastAPI(title="Payment Service", version="1.0.0")
 
-<<<<<<< HEAD
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup
+@app.on_event("startup")
+async def startup_event():
     await init_db()
-    print("🚀 Payment Service started successfully")
-    yield
-    # Shutdown
-    print("🛑 Payment Service shutting down")
-=======
-    @app.route('/')
-    def index():
-        return "✅ Payment Service connected to Mongodb successfully!"
->>>>>>> 506927b6215231efd49f9ca06517d9da0547a5be
 
-app = FastAPI(
-    title="Payment Service API",
-    description="Microservice xử lý thanh toán cho hệ thống Rental Car",
-    version="1.0.0",
-    lifespan=lifespan
-)
+@app.on_event("shutdown")
+async def shutdown_event():
+    await close_db()
 
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+@app.get("/api/health", tags=["Health"])
+async def health_check():
+    return {"status": "ok", "service": "payment_service"}
 
-# Include routers
-app.include_router(health.router, prefix="/api/v1", tags=["Health"])
-app.include_router(payments.router, prefix="/api/v1/payments", tags=["Payments"])
-
-@app.get("/")
-async def root():
-    return {
-        "message": "Payment Service is running!",
-        "version": "1.0.0",
-        "docs": "/docs"
-    }
+# mount API router
+app.include_router(payment_router, prefix="/api")

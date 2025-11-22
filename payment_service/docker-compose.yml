@@ -1,8 +1,9 @@
 version: '3.8'
+
 services:
   db-payment:
     image: mongo:8.2
-    container_name: MongoDB-Payment
+    container_name: mongodb-payment
     environment:
       MONGO_INITDB_DATABASE: db-payment
     ports:
@@ -15,7 +16,7 @@ services:
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 5s
-      timeout: 2s
+      timeout: 5s
       retries: 5
       start_period: 20s
 
@@ -28,14 +29,14 @@ services:
     ports:
       - "8004:8004"
     env_file:
-      - ./.env.payment
+      - ./.env
     depends_on:
       db-payment:
         condition: service_healthy
     networks:
       - rental-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8004/api/v1/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8004/api/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
