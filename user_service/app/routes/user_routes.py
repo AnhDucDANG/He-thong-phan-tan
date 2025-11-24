@@ -1,9 +1,13 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Header, Form, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, OAuth2PasswordRequestForm
+from fastapi.responses import FileResponse
 from datetime import datetime, timedelta
 import logging
 import secrets
 from bson import ObjectId
+import os
+import uuid
+from pathlib import Path
 
 from ..schemas.user_schema import (
     UserRegister, UserLogin, UserResponse, TokenResponse, 
@@ -320,6 +324,106 @@ async def change_password(
     logger.info(f"✅ Password changed for: {current_user['email']}")
     
     return {"message": "Password changed successfully"}
+
+
+@router.post("/upload-avatar", response_model=dict)
+async def upload_avatar(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Upload user avatar image"""
+    logger.info(f"📸 Avatar upload request from: {current_user['email']}")
+    
+    # Validate file extension
+    file_ext = Path(file.filename).suffix.lower()
+    if file_ext not in settings.ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid file type. Allowed: {', '.join(settings.ALLOWED_EXTENSIONS)}"
+        )
+    
+    # Validate file size
+    file_content = await file.read()
+    if len(file_content) > settings.MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File too large. Maximum size: {settings.MAX_FILE_SIZE / 1024 / 1024}MB"
+        )
+    
+    # Create upload directory if not exists
+    settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Generate unique filename
+    unique_filename = f"{current_user['_id']}_{uuid.uuid4().hex}{file_ext}"
+    file_path = settings.UPLOAD_DIR / unique_filename
+    
+    # Delete old avatar if exists
+    if current_user.get("avatar_url"):
+        old_filename = current_user["avatar_url"].split("/")[-1]
+        old_file_path = settings.UPLOAD_DIR / old_filename
+        if old_file_path.exists():
+            try:
+                old_file_path.unlink()
+                logger.info(f"🗑️ Deleted old avatar: {old_filename}")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not delete old avatar: {e}")
+    
+    # Save new file
+    try:
+        with open(file_path, "wb") as f:
+            f.write(file_content)
+        logger.info(f"💾 Saved avatar: {unique_filename}")
+    except Exception as e:
+        logger.error(f"❌ Error saving file: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save file"
+        )
+    
+    # Update user avatar_url in database
+    avatar_url = f"/api/users/avatars/{unique_filename}"
+    users_collection = get_users_collection()
+    await users_collection.update_one(
+        {"_id": current_user["_id"]},
+        {
+            "$set": {
+                "avatar_url": avatar_url,
+                "updated_at": datetime.utcnow()
+            }
+        }
+    )
+    
+    logger.info(f"✅ Avatar uploaded successfully for: {current_user['email']}")
+    
+    return {
+        "message": "Avatar uploaded successfully",
+        "avatar_url": avatar_url
+    }
+
+
+@router.get("/avatars/{filename}")
+async def get_avatar(filename: str):
+    """Serve avatar image file"""
+    file_path = settings.UPLOAD_DIR / filename
+    
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Avatar not found"
+        )
+    
+    # Validate filename to prevent directory traversal
+    if ".." in filename or "/" in filename or "\\" in filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid filename"
+        )
+    
+    return FileResponse(
+        path=file_path,
+        media_type="image/jpeg",  # Will be auto-detected by browser
+        filename=filename
+    )
 
 @router.post("/forgot-password", response_model=MessageResponse)
 async def forgot_password(data: ForgotPassword):

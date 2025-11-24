@@ -1,5 +1,6 @@
 import os
 from typing import Optional
+from pathlib import Path
 
 class Settings:
     # MongoDB
@@ -14,5 +15,10 @@ class Settings:
     # Email verification
     EMAIL_VERIFICATION_EXPIRE_HOURS: int = 24
     PASSWORD_RESET_EXPIRE_HOURS: int = 1
+    
+    # File upload
+    UPLOAD_DIR: Path = Path("/app/uploads/avatars")
+    MAX_FILE_SIZE: int = 5 * 1024 * 1024  # 5MB
+    ALLOWED_EXTENSIONS: set = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
     
 settings = Settings()

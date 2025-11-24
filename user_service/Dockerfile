@@ -15,6 +15,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy source code
 COPY ./app ./app
 
+# Create uploads directory for avatars
+RUN mkdir -p /app/uploads/avatars && chmod 755 /app/uploads/avatars
+
 # Expose port
 EXPOSE 8001
 
