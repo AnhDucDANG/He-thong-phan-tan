@@ -1,3 +1,45 @@
+# version: '3.8' # Phiên bản cú pháp Docker Compose
+
+# services:
+#  vehicle_service:
+#     build:
+#       context: .
+#       dockerfile: Dockerfile
+#     container_name: vehicle_service
+#     restart: unless-stopped
+    
+#     ports:
+#       - "8002:8002"
+#       - "100.73.22.88:8002:8002"
+    
+#     environment:
+#       - MONGO_URL=mongodb://100.69.63.99:27017/rental_db
+#       - MONGO_DB=rental_db
+      
+#       - SERVICE_PORT=8002
+#       - SERVICE_HOST=0.0.0.0
+#       - MY_TAILSCALE_IP=100.73.22.88
+      
+#       # External Services (qua Tailscale)
+#       - USER_SERVICE_URL=http://100.69.63.99:8001
+#       - VEHICLE_SERVICE_URL=http://100.73.22.88:8002
+#       - BOOKING_SERVICE_URL=http://100.65.117.32:8003
+#       - PAYMENT_SERVICE_URL=http://100.108.163.69:8004
+      
+   
+#       - REQUEST_TIMEOUT=120
+    
+    
+    
+#     healthcheck:
+#       test: ["CMD-SHELL", "curl -f http://localhost:8002/health || exit 1"]
+#       interval: 10s
+#       timeout: 5s
+#       retries: 5
+#       start_period: 20s
+
+############ Kết thúc của lâm ##################################
+
 version: '3.8' # Phiên bản cú pháp Docker Compose
 
 services:

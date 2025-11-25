@@ -25,45 +25,56 @@ exports.getAllVehicles = async (req, res) => {
 
 // 2. Tạo phương tiện mới (Create)
 exports.createVehicle = async (req, res) => {
-    // 1. Lấy ownerId từ request body
-    const { ownerId, ...vehicleData } = req.body; 
+    
+    const vehicleData = req.body;
+
+    // --- BƯỚC 1: VALIDATION CÁC TRƯỜNG TỪ SCHEMA ---
+    const { 
+        make, 
+        model, 
+        year, 
+        licensePlate, 
+        dailyRate, 
+        transmission, 
+        location 
+    } = vehicleData;
+    
+    // Kiểm tra các trường BẮT BUỘC theo VehicleSchema
+    if (!make || !model || !year || !licensePlate || !dailyRate || !transmission || 
+        !location || !location.coordinates || location.coordinates.length !== 2) {
+        
+        return res.status(400).json({ 
+            message: "Thiếu các thông tin bắt buộc: Hãng, Dòng xe, Năm, Biển số, Giá thuê, Hộp số hoặc Tọa độ Vị trí." 
+        });
+    }
 
     try {
-        // --- LOGIC GIAO TIẾP VÀ XÁC THỰC SERVICE-TO-SERVICE ---
+        // --- BƯỚC 2: LƯU PHƯƠNG TIỆN VÀO DB ---
         
-        // Kiểm tra xem ownerId có được cung cấp không
-        if (!ownerId) {
-            return res.status(400).json({ message: "Owner ID is required." });
-        }
-        
-        console.log(`Verifying owner ID: ${ownerId} via Tailscale at ${USER_SERVICE_URL}...`);
-        
-        // 2. Gửi yêu cầu GET đến User Service (Đây là nơi dùng await)
-        const userResponse = await axios.get(`${USER_SERVICE_URL}/api/users/${ownerId}`);
-
-        // 3. Xử lý phản hồi: Nếu User Service không tìm thấy ownerId
-        if (userResponse.status !== 200 || !userResponse.data) {
-             return res.status(404).json({ message: "Owner ID not found in User Service." });
-        }
-        
-        // --- KẾT THÚC GIAO TIẾP ---
-
-        // 4. Lưu phương tiện vào DB (nếu xác thực thành công)
-        const newVehicle = new Vehicle(req.body);
+        const newVehicle = new Vehicle(vehicleData);
         const savedVehicle = await newVehicle.save();
-        res.status(201).json(savedVehicle);
+        
+        res.status(201).json({
+            message: "Đăng ký xe thành công theo dữ liệu đã cung cấp.",
+            data: savedVehicle
+        });
 
     } catch (error) {
-        // Xử lý lỗi từ axios (Service của Lâm không chạy, 404, 500, v.v.)
-        if (error.response && error.response.status === 404) {
-             return res.status(404).json({ message: "Owner ID not found in User Service or API path incorrect." });
+        // --- BƯỚC 3: XỬ LÝ LỖI (CHỦ YẾU LÀ LỖI DB) ---
+        
+        // Xử lý lỗi Mongoose validation hoặc lỗi biển số xe bị trùng (unique: true)
+        if (error.name === 'ValidationError' || error.code === 11000) {
+            console.error("Database Validation/Unique Error:", error.message);
+            return res.status(400).json({
+                message: 'Lỗi dữ liệu: Biển số xe đã tồn tại hoặc thiếu trường bắt buộc.',
+                error: error.message
+            });
         }
         
-        // Xử lý lỗi Mongoose/Internal Server Error khác
-        console.error("Error details:", error.message);
-        res.status(400).json({ 
-            message: 'Error creating vehicle or verifying owner', 
-            error: error.message || error 
+        console.error("Internal Server Error:", error.message);
+        res.status(500).json({ 
+            message: 'Lỗi server nội bộ khi lưu dữ liệu xe.', 
+            error: error.message 
         });
     }
 };
