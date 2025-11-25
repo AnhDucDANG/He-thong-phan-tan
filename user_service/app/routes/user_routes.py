@@ -538,10 +538,28 @@ async def get_user_stats(admin_user: dict = Depends(get_current_admin)):
             "is_deleted": False
         })
         
+        daily_signups.append({
+            "date": day_start.strftime("%Y-%m-%d"),
+            "count": count
+        })
     
+    logger.info(f"✅ Stats retrieved: total={total_users}, customers={customers}, admins={admins}")
+    
+    return {
+        "total_users": total_users,
+        "verified_users": verified_users,
+        "customers": customers,
+        "admins": admins,
+        "daily_signups": daily_signups
+    }
+
+
+@router.delete("/me")
+async def delete_account(current_user: dict = Depends(get_current_user)):
+    """Delete current user account (soft delete)"""
     users_collection = get_users_collection()
     await users_collection.update_one(
-        {"_id": current_user["_id"]},
+        {"_id": ObjectId(current_user["_id"])},
         {
             "$set": {
                 "is_deleted": True,

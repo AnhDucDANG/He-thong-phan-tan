@@ -313,7 +313,7 @@ services:
       - "${MY_TAILSCALE_IP}:8001:8001"
     environment:
       - MONGO_URL=mongodb://mongos:27017
-      - MONGO_DB=rental_db
+      - MONGO_DB=rental
       - SECRET_KEY=${SECRET_KEY}
       - ALGORITHM=${ALGORITHM}
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
