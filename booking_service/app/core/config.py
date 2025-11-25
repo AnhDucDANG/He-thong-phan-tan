@@ -22,17 +22,10 @@ class Settings:
 
     MONGO_URL = os.getenv("MONGO_URL")
     if not MONGO_URL:
-        MONGO_USER = os.getenv("MONGO_USER", "appUser")
-        MONGO_PASSWORD = os.getenv("MONGO_PASSWORD", "Lyly250502")
-        MONGO_HOST = os.getenv("MONGO_HOST", "db-booking")
-        MONGO_PORT = os.getenv("MONGO_PORT", "27017")
-        MONGO_DB = os.getenv("MONGO_DB", "BookingCar")
-        
-        # Tạo URL cơ bản
-        MONGO_USER_QUOTED = urllib.parse.quote_plus(MONGO_USER)
-        MONGO_PASSWORD_QUOTED = urllib.parse.quote_plus(MONGO_PASSWORD)
-        MONGO_URL = f"mongodb://{MONGO_USER_QUOTED}:{MONGO_PASSWORD_QUOTED}@{MONGO_HOST}:{MONGO_PORT}/{MONGO_DB}?authSource=admin"
+        MONGO_URL = "mongodb://100.69.63.99:27018/rental_db"
     
+    MONGO_DB = os.getenv("MONGO_DB", "rental_db")
+        
     SERVICE_MAP = {
         "users": USER_SERVICE_URL,
         "vehicles": VEHICLE_SERVICE_URL,

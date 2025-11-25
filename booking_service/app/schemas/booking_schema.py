@@ -15,9 +15,9 @@ BookingStatus = Literal[
 class BookingBase(BaseModel):
     """Base schema containing common fields for creating/updating a booking."""
     
-    user_id: int = Field(..., description="ID of the customer making the booking (from User Service).")
+    user_id: str = Field(..., description="ID (ObjectId string) of the customer making the booking (from User Service).")
     
-    car_id: str = Field(..., description="ID of the car being booked (from Car/Inventory Service).")
+    car_id: str = Field(..., description="ID (ObjectId string) of the car being booked (from Car/Inventory Service).")
     
     start_date: datetime
     end_date: datetime
@@ -37,7 +37,6 @@ class BookingBase(BaseModel):
                 "user_id": 101,
                 "car_id": "CAR-ABC-123",
                 "pickup_location": "Sân bay Tân Sơn Nhất",
-                "return_location": "Quận 1, TP.HCM",
                 "start_date": "2025-12-01T10:00:00",
                 "end_date": "2025-12-05T10:00:00",
                 "notes": "Yêu cầu xe có GPS"
@@ -48,6 +47,9 @@ class BookingBase(BaseModel):
 # INPUT SCHEMAS (Client -> API)
 class BookingCreate(BookingBase):
     """Schema for creating a new booking."""
+    pickup_location: Literal["HANOI", "HOCHIMINH", "DANANG"] = Field(
+        ..., description="Địa điểm nhận xe - dùng làm shard key"
+    )
     # status mặc định là 'pending'
     status: Literal["pending"] = "pending"   
 
@@ -73,7 +75,7 @@ class BookingResponse(BookingBase):
     
     book_price: float = Field(..., description="Final calculated price of the booking.")
     
-    # xếp hạng xe, số ngày thuê
+    # Đơn giá, số ngày thuê
     daily_rate: float = Field(..., description="Daily rental rate of the car at the time of booking.")
     total_days: int = Field(..., description="Total number of rental days.")
     

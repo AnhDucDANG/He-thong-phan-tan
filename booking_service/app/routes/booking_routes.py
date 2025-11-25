@@ -1,44 +1,41 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from ..schemas.booking_schema import BookingCreate, BookingResponse
-from ..services.booking_service import save_booking
+from app.database.crud import create_booking_transaction
+from beanie import PydanticObjectId
+from app.models.booking_model import Booking
+from ..services import user_service, car_service, payment_service
+#dependency nếu cần
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 
 # Api tạo đơn đặt xe
 @router.post("/", response_model=BookingResponse, status_code=201)
 async def create_booking(booking_data: BookingCreate):
-    # b1: gọi User service
-    # user_verified = user_service.verify_license(booking_data.user_id)
-    # if not user_verified:
-    #     raise HTTPException(status_code=403, detail="User license not valid")
+
+    # b1: gọi User service verify blx của khách
+    await user_service.verify_user_license(int(booking_data.user_id))
     
-    # b2: gọi Car Service
-    # car_available = car_service.check_availability(booking_data.car_id, booking_data.start_date, booking_data.end_date)
-    # if not car_available:
-    #     raise HTTPException(status_code=404, detail="Car not available")
+    # b2: gọi Car Service check xe available và lấy đơn giá
+    car_info = await car_service.check_car_availability(
+        booking_data.car_id,
+        booking_data.start_date.date(),
+        booking_data.end_date.date()
+    )
+    daily_rate = float(car_info.get("daily_rate", 0))
 
     # b3: tính bill
-    # total_amount = calculate_price(booking_data.car_id, booking_data.start_date, booking_data.end_date)
+    delta = booking_data.end_date - booking_data.start_date
+    total_days = delta.days + 1
+    total_amount = daily_rate * total_days
     
     # b4: gọi Payment service
-    # payment_status = payment_service.process_payment(total_amount)
-    #try:
-    #    booking_data.user_id = int(booking_data.user_id)
-    #except (ValueError, TypeError):
-    #    raise HTTPException(
-    #        status_code=400,
-    #        detail="user_id must be a valid integer"
-    #   )
-
-    total_amount = 2500000 
+    # payment_status = await payment_service.process_payment("booking_id thật", total_amount)
     payment_status = "CONFIRMED"
 
     # b5: lưu vào DB
-    # booking_id = database.save_booking(booking_data, payment_status)
-    # car_service.mark_car_as_booked(booking_data.car_id, booking_id)
     try:
-        db_booking = await save_booking(booking_data, payment_status, total_amount)
-        
+        db_booking = await create_booking_transaction(booking_data, total_amount)
+
     except ValueError as e:
         # Lỗi validation (user_id, car_id không hợp lệ)
         raise HTTPException(status_code=400, detail=f"Validation Error: {str(e)}")
@@ -49,6 +46,10 @@ async def create_booking(booking_data: BookingCreate):
         if "already reserved" in error_msg or "concurrency" in error_msg:
             raise HTTPException(status_code=409, detail=str(e))
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
+    # b6: đánh dấu xe đã đặt (fire-and-forget)
+    import asyncio
+    asyncio.create_task(car_service.mark_car_as_booked(booking_data.car_id, str(db_booking.id)))
     
     return BookingResponse(
         id=str(db_booking.id),
@@ -65,10 +66,30 @@ async def create_booking(booking_data: BookingCreate):
     )
 
 # Api xem Booking
-@router.get("/{booking_id}", response_model=BookingResponse)
+@router.get("/{booking_id}", response_model=BookingResponse, status_code=200)
 async def get_booking_details(booking_id: str):
-    # TODO: implement thật sau
-    return {"id": booking_id, "status": "CONFIRMED"}
+    """
+    Lấy chi tiết một booking theo ID
+    """
+    try:
+        # Chuyển string → ObjectId rồi tìm trong DB
+        booking = await Booking.get(PydanticObjectId(booking_id))
+        
+        if not booking:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Booking with id {booking_id} not found"
+            )
+        
+        return booking
+    
+    except Exception as e:
+        # Nếu booking_id không phải ObjectId hợp lệ
+        if "invalid" in str(e).lower() or "objectid" in str(e).lower():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid booking ID format"
+            )
 
 # Api hủy Booking
 @router.post("/{booking_id}/cancel")

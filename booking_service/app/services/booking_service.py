@@ -1,7 +1,20 @@
+import httpx
 from app.schemas.booking_schema import BookingCreate
 from fastapi import HTTPException
 from datetime import datetime, timedelta
 from app.models.booking_model import Booking
+from app.core.config import settings
+
+VEHICLE_SERVICE_URL = settings.VEHICLE_SERVICE_URL
+async def get_vehicle_daily_rate(car_id: str) -> float:
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.get(f"{VEHICLE_SERVICE_URL}/api/v1/vehicles/{car_id}")
+            resp.raise_for_status()
+            data = resp.json()
+            return float(data["daily_rate"])
+        except Exception as e:
+            raise HTTPException(status_code=424, detail=f"Cannot get price from Vehicle Service: {str(e)}")
 
 async def save_booking(booking_data: BookingCreate, payment_status: str, total_amount: float):
     # Tính số ngày thuê (làm tròn lên nếu có giờ lẻ)
@@ -13,10 +26,15 @@ async def save_booking(booking_data: BookingCreate, payment_status: str, total_a
     total_days = delta.days + 1  # phổ biến nhất trong ngành cho thuê xe
 
     # daily_rate sau này có thể lấy từ Vehicle Service
-    if total_days <= 0:
-        daily_rate = float(total_amount)
-    else:
-        daily_rate = round(total_amount / total_days, 2)
+    #if total_days <= 0:
+    #    daily_rate = float(total_amount)
+    #else:
+    #    daily_rate = round(total_amount / total_days, 2)
+
+    daily_rate = await get_vehicle_daily_rate(booking_data.car_id)
+    delta = booking_data.end_date - booking_data.start_date
+    total_days = delta.days + 1
+    total_amount = daily_rate * total_days
 
     booking = Booking(
         user_id=booking_data.user_id,

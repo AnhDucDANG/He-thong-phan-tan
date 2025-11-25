@@ -25,6 +25,9 @@ class Booking(Document):
     # Số ngày thuê
     total_days: int
 
+    # Điểm nhận xe sử dụng Literal (Enum-like) để giới hạn giá trị
+    pickup_location: Literal["HANOI", "HOCHIMINH", "DANANG"] = Field(...)
+
     # Trạng thái sử dụng Literal (Enum-like) để giới hạn giá trị
     status: Literal[
         "PENDING_PAYMENT", 
@@ -41,7 +44,7 @@ class Booking(Document):
     # --- Cấu hình Beanie Document ---
     class Settings:
         # Tên bảng trong db
-        name = "booking"
+        name = "bookings"
         
         # Định nghĩa các index phức tạp (Compound Indexes) để tối ưu truy vấn
         # Định dạng: List[Tuple[Tuple[field_name, direction], ...], ...]
@@ -62,6 +65,10 @@ class Booking(Document):
             # Index 3: Index để tìm kiếm nhanh theo user_id
             "user_id" 
         ]
+        
+        use_shard_key = True
+        shard_keys = [{"pickup_location": 1}]
+        # hoặc shard_keys = [{"pickup_location": "hashed"}]
         
         # Tuỳ chọn: Tăng tốc độ parsing Pydantic
         keep_union_tag = True
