@@ -13,7 +13,7 @@ router = APIRouter(prefix="/bookings", tags=["bookings"])
 async def create_booking(booking_data: BookingCreate):
 
     # b1: gọi User service verify blx của khách
-    await user_service.verify_user_license(int(booking_data.user_id))
+    await user_service.verify_user_license(booking_data.user_id)
     
     # b2: gọi Car Service check xe available và lấy đơn giá
     car_info = await car_service.check_car_availability(

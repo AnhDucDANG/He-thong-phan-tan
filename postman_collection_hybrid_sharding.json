@@ -1,0 +1,1176 @@
+{
+  "info": {
+    "name": "Car Rental System - Hybrid Sharding Tests",
+    "description": "Complete test suite for MongoDB Hybrid Sharding (7 Shards: 4 Vertical + 3 Horizontal Geographic)\n\n**Architecture:**\n- Shard 1 (27021): Users Collection (Vertical)\n- Shard 2 (27022): Vehicles Collection (Vertical)\n- Shard 3A (27025): Bookings North Zone - Hanoi (Horizontal)\n- Shard 3B (27026): Bookings South Zone - HCM (Horizontal)\n- Shard 3C (27027): Bookings Central Zone - Danang (Horizontal)\n- Shard 4 (27024): Payments Collection (Vertical)\n- Config Server (27019): Cluster Metadata\n\n**Test Coverage:**\n1. Infrastructure & Health Checks\n2. MongoDB Cluster Verification\n3. User Management (Shard 1)\n4. Booking Service Geographic Routing (Shards 3A/3B/3C)\n5. Query Performance & Routing Tests\n6. Data Distribution Analysis",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "hybrid-sharding-v1"
+  },
+  "item": [
+    {
+      "name": "🏥 1. Infrastructure Health Checks",
+      "item": [
+        {
+          "name": "API Gateway Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Check API Gateway (port 8000) status"
+          },
+          "response": []
+        },
+        {
+          "name": "User Service Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{user_service_url}}/health",
+              "host": ["{{user_service_url}}"],
+              "path": ["health"]
+            },
+            "description": "Check User Service (port 8001) status"
+          },
+          "response": []
+        },
+        {
+          "name": "Booking Service Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{booking_service_url}}/health",
+              "host": ["{{booking_service_url}}"],
+              "path": ["health"]
+            },
+            "description": "Check Booking Service (port 8003) status"
+          },
+          "response": []
+        },
+        {
+          "name": "Check Tailscale Connection",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{tailscale_ip}}:8000/health",
+              "protocol": "http",
+              "host": ["{{tailscale_ip}}"],
+              "port": "8000",
+              "path": ["health"]
+            },
+            "description": "Verify Tailscale VPN connectivity"
+          },
+          "response": []
+        }
+      ],
+      "description": "Verify all services and infrastructure are running"
+    },
+    {
+      "name": "🗄️ 2. MongoDB Cluster Verification",
+      "item": [
+        {
+          "name": "Cluster Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/mongodb/cluster/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "mongodb", "cluster", "status"]
+            },
+            "description": "Get complete cluster status including all 7 shards"
+          },
+          "response": []
+        },
+        {
+          "name": "List All Shards",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/mongodb/shards",
+              "host": ["{{base_url}}"],
+              "path": ["api", "mongodb", "shards"]
+            },
+            "description": "List all shards with their replica sets and zones"
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Geographic Zones",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/mongodb/zones",
+              "host": ["{{base_url}}"],
+              "path": ["api", "mongodb", "zones"]
+            },
+            "description": "Check ZONE_NORTH, ZONE_SOUTH, ZONE_CENTRAL configuration"
+          },
+          "response": []
+        },
+        {
+          "name": "Database Statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/mongodb/stats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "mongodb", "stats"]
+            },
+            "description": "Get database size, collections, and shard distribution"
+          },
+          "response": []
+        }
+      ],
+      "description": "Verify MongoDB Hybrid Sharding configuration"
+    },
+    {
+      "name": "👤 3. User Management (Shard 1 - Vertical)",
+      "item": [
+        {
+          "name": "Register Admin User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 or 201\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has user data\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('username');",
+                  "    pm.expect(jsonData).to.have.property('email');",
+                  "    pm.expect(jsonData.role).to.eql('admin');",
+                  "    ",
+                  "    // Save user_id for later use",
+                  "    if (jsonData._id) {",
+                  "        pm.environment.set('admin_user_id', jsonData._id);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin_hybrid\",\n  \"email\": \"admin@rental-hybrid.com\",\n  \"password\": \"Admin@123\",\n  \"full_name\": \"System Administrator\",\n  \"phone\": \"+84900000001\",\n  \"role\": \"admin\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/users/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users", "register"]
+            },
+            "description": "Register admin user - data stored in Shard 1 (Users)"
+          },
+          "response": []
+        },
+        {
+          "name": "Login Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Has access token\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('access_token');",
+                  "    ",
+                  "    // Save token for authenticated requests",
+                  "    pm.environment.set('admin_token', jsonData.access_token);",
+                  "});",
+                  "",
+                  "pm.test(\"Token type is Bearer\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.token_type).to.eql('bearer');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "admin_hybrid",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "Admin@123",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/users/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users", "login"]
+            },
+            "description": "Login and get JWT token"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Admin Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/users/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users", "me"]
+            },
+            "description": "Get current user profile (requires authentication)"
+          },
+          "response": []
+        },
+        {
+          "name": "Register Customer - Hanoi",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"User registered successfully\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set('customer_hanoi_id', jsonData._id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"customer_hanoi\",\n  \"email\": \"hanoi@rental.com\",\n  \"password\": \"Customer@123\",\n  \"full_name\": \"Nguyen Van A\",\n  \"phone\": \"+84901234567\",\n  \"address\": \"Ba Dinh, Hanoi\",\n  \"role\": \"customer\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/users/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users", "register"]
+            },
+            "description": "Register customer from Hanoi (North region)"
+          },
+          "response": []
+        },
+        {
+          "name": "Register Customer - HCM",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"User registered successfully\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set('customer_hcm_id', jsonData._id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"customer_hcm\",\n  \"email\": \"hcm@rental.com\",\n  \"password\": \"Customer@123\",\n  \"full_name\": \"Tran Thi B\",\n  \"phone\": \"+84907654321\",\n  \"address\": \"District 1, Ho Chi Minh\",\n  \"role\": \"customer\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/users/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users", "register"]
+            },
+            "description": "Register customer from HCM (South region)"
+          },
+          "response": []
+        },
+        {
+          "name": "Register Customer - Danang",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"User registered successfully\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set('customer_danang_id', jsonData._id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"customer_danang\",\n  \"email\": \"danang@rental.com\",\n  \"password\": \"Customer@123\",\n  \"full_name\": \"Le Van C\",\n  \"phone\": \"+84905555555\",\n  \"address\": \"Hai Chau, Da Nang\",\n  \"role\": \"customer\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/users/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users", "register"]
+            },
+            "description": "Register customer from Danang (Central region)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Users (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/users?limit=50",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            },
+            "description": "List all users (admin only) - Query Shard 1"
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Avatar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/users/upload-avatar",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users", "upload-avatar"]
+            },
+            "description": "Upload user avatar (select a file in Body -> form-data)"
+          },
+          "response": []
+        }
+      ],
+      "description": "Test User Service with data stored in Shard 1 (Vertical Sharding)"
+    },
+    {
+      "name": "📅 4. Booking Service (Shards 3A/3B/3C - Geographic)",
+      "item": [
+        {
+          "name": "Create Booking - HANOI (→ Shard 3A North)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Booking created successfully\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.pickup_location).to.eql('HANOI');",
+                  "    pm.environment.set('booking_hanoi_id', jsonData._id);",
+                  "});",
+                  "",
+                  "pm.test(\"Routed to ZONE_NORTH\", function () {",
+                  "    // This booking should be stored in Shard 3A (port 27025)",
+                  "    console.log('✅ Booking routed to Shard 3A - ZONE_NORTH (Hanoi)');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{customer_hanoi_id}}\",\n  \"vehicle_id\": \"vehicle_001\",\n  \"pickup_location\": \"HANOI\",\n  \"dropoff_location\": \"HAI_PHONG\",\n  \"start_date\": \"2024-02-01T08:00:00Z\",\n  \"end_date\": \"2024-02-05T18:00:00Z\",\n  \"total_price\": 5000000,\n  \"status\": \"confirmed\"\n}"
+            },
+            "url": {
+              "raw": "{{booking_service_url}}/api/bookings",
+              "host": ["{{booking_service_url}}"],
+              "path": ["api", "bookings"]
+            },
+            "description": "Create booking with pickup_location=HANOI\n→ MongoDB routes to Shard 3A (ZONE_NORTH, port 27025)"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Booking - HO_CHI_MINH (→ Shard 3B South)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Booking created successfully\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.pickup_location).to.eql('HO_CHI_MINH');",
+                  "    pm.environment.set('booking_hcm_id', jsonData._id);",
+                  "});",
+                  "",
+                  "pm.test(\"Routed to ZONE_SOUTH\", function () {",
+                  "    console.log('✅ Booking routed to Shard 3B - ZONE_SOUTH (HCM)');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{customer_hcm_id}}\",\n  \"vehicle_id\": \"vehicle_002\",\n  \"pickup_location\": \"HO_CHI_MINH\",\n  \"dropoff_location\": \"VUNG_TAU\",\n  \"start_date\": \"2024-02-10T08:00:00Z\",\n  \"end_date\": \"2024-02-15T18:00:00Z\",\n  \"total_price\": 6000000,\n  \"status\": \"confirmed\"\n}"
+            },
+            "url": {
+              "raw": "{{booking_service_url}}/api/bookings",
+              "host": ["{{booking_service_url}}"],
+              "path": ["api", "bookings"]
+            },
+            "description": "Create booking with pickup_location=HO_CHI_MINH\n→ MongoDB routes to Shard 3B (ZONE_SOUTH, port 27026)"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Booking - DA_NANG (→ Shard 3C Central)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Booking created successfully\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.pickup_location).to.eql('DA_NANG');",
+                  "    pm.environment.set('booking_danang_id', jsonData._id);",
+                  "});",
+                  "",
+                  "pm.test(\"Routed to ZONE_CENTRAL\", function () {",
+                  "    console.log('✅ Booking routed to Shard 3C - ZONE_CENTRAL (Danang)');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{customer_danang_id}}\",\n  \"vehicle_id\": \"vehicle_003\",\n  \"pickup_location\": \"DA_NANG\",\n  \"dropoff_location\": \"HUE\",\n  \"start_date\": \"2024-02-20T08:00:00Z\",\n  \"end_date\": \"2024-02-25T18:00:00Z\",\n  \"total_price\": 4500000,\n  \"status\": \"confirmed\"\n}"
+            },
+            "url": {
+              "raw": "{{booking_service_url}}/api/bookings",
+              "host": ["{{booking_service_url}}"],
+              "path": ["api", "bookings"]
+            },
+            "description": "Create booking with pickup_location=DA_NANG\n→ MongoDB routes to Shard 3C (ZONE_CENTRAL, port 27027)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Bookings - Targeted Query (HANOI)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{booking_service_url}}/api/bookings?pickup_location=HANOI",
+              "host": ["{{booking_service_url}}"],
+              "path": ["api", "bookings"],
+              "query": [
+                {
+                  "key": "pickup_location",
+                  "value": "HANOI",
+                  "description": "Shard key - routes to Shard 3A only"
+                }
+              ]
+            },
+            "description": "✅ TARGETED QUERY (Fast)\nQuery includes shard key (pickup_location)\n→ Mongos routes to Shard 3A only\n→ Low latency, efficient"
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Bookings - Scatter-Gather Query",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{booking_service_url}}/api/bookings",
+              "host": ["{{booking_service_url}}"],
+              "path": ["api", "bookings"]
+            },
+            "description": "⚠️ SCATTER-GATHER QUERY (Slower)\nQuery without shard key\n→ Mongos queries all 3 booking shards (3A+3B+3C)\n→ Merges results\n→ Higher latency but complete data"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Booking by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{booking_service_url}}/api/bookings/{{booking_hanoi_id}}",
+              "host": ["{{booking_service_url}}"],
+              "path": ["api", "bookings", "{{booking_hanoi_id}}"]
+            },
+            "description": "Get specific booking by ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Booking Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"completed\"\n}"
+            },
+            "url": {
+              "raw": "{{booking_service_url}}/api/bookings/{{booking_hanoi_id}}",
+              "host": ["{{booking_service_url}}"],
+              "path": ["api", "bookings", "{{booking_hanoi_id}}"]
+            },
+            "description": "Update booking status to completed"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Booking",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{booking_service_url}}/api/bookings/{{booking_danang_id}}",
+              "host": ["{{booking_service_url}}"],
+              "path": ["api", "bookings", "{{booking_danang_id}}"]
+            },
+            "description": "Delete a booking"
+          },
+          "response": []
+        }
+      ],
+      "description": "Test Booking Service with Geographic Horizontal Sharding across 3 zones"
+    },
+    {
+      "name": "📊 5. Data Distribution & Performance",
+      "item": [
+        {
+          "name": "Bulk Insert Bookings - North Region",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"count\": 20,\n  \"pickup_location\": \"HANOI\",\n  \"user_id\": \"{{customer_hanoi_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{booking_service_url}}/api/bookings/bulk",
+              "host": ["{{booking_service_url}}"],
+              "path": ["api", "bookings", "bulk"]
+            },
+            "description": "Create 20 test bookings for HANOI → all go to Shard 3A"
+          },
+          "response": []
+        },
+        {
+          "name": "Bulk Insert Bookings - South Region",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"count\": 30,\n  \"pickup_location\": \"HO_CHI_MINH\",\n  \"user_id\": \"{{customer_hcm_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{booking_service_url}}/api/bookings/bulk",
+              "host": ["{{booking_service_url}}"],
+              "path": ["api", "bookings", "bulk"]
+            },
+            "description": "Create 30 test bookings for HCM → all go to Shard 3B"
+          },
+          "response": []
+        },
+        {
+          "name": "Bulk Insert Bookings - Central Region",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"count\": 15,\n  \"pickup_location\": \"DA_NANG\",\n  \"user_id\": \"{{customer_danang_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{booking_service_url}}/api/bookings/bulk",
+              "host": ["{{booking_service_url}}"],
+              "path": ["api", "bookings", "bulk"]
+            },
+            "description": "Create 15 test bookings for DANANG → all go to Shard 3C"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Booking Distribution by Zone",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{booking_service_url}}/api/bookings/distribution",
+              "host": ["{{booking_service_url}}"],
+              "path": ["api", "bookings", "distribution"]
+            },
+            "description": "Get count of bookings per geographic zone\nShows data distribution across Shards 3A/3B/3C"
+          },
+          "response": []
+        },
+        {
+          "name": "Query Performance - Targeted (with shard key)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Response time < 200ms (Targeted)\", function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(200);",
+                  "    console.log('⚡ Targeted query time:', pm.response.responseTime, 'ms');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{booking_service_url}}/api/bookings?pickup_location=HO_CHI_MINH&limit=100",
+              "host": ["{{booking_service_url}}"],
+              "path": ["api", "bookings"],
+              "query": [
+                {
+                  "key": "pickup_location",
+                  "value": "HO_CHI_MINH"
+                },
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ]
+            },
+            "description": "✅ Fast query - routes to Shard 3B only\nExpected: <200ms response time"
+          },
+          "response": []
+        },
+        {
+          "name": "Query Performance - Scatter-Gather (no shard key)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Response received\", function () {",
+                  "    pm.response.to.be.ok;",
+                  "    console.log('🔍 Scatter-gather query time:', pm.response.responseTime, 'ms');",
+                  "    console.log('⚠️ Queries all 3 shards (3A+3B+3C)');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{booking_service_url}}/api/bookings?status=confirmed&limit=100",
+              "host": ["{{booking_service_url}}"],
+              "path": ["api", "bookings"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "confirmed"
+                },
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ]
+            },
+            "description": "⚠️ Slower query - queries all 3 shards\nExpected: Higher latency than targeted query"
+          },
+          "response": []
+        },
+        {
+          "name": "Explain Query Plan - Targeted",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"collection\": \"bookings\",\n  \"query\": {\n    \"pickup_location\": \"HANOI\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{booking_service_url}}/api/bookings/explain",
+              "host": ["{{booking_service_url}}"],
+              "path": ["api", "bookings", "explain"]
+            },
+            "description": "Get MongoDB explain plan for targeted query\nShows: nShards=1, targetedShard=3A"
+          },
+          "response": []
+        },
+        {
+          "name": "Explain Query Plan - Scatter-Gather",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"collection\": \"bookings\",\n  \"query\": {\n    \"status\": \"confirmed\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{booking_service_url}}/api/bookings/explain",
+              "host": ["{{booking_service_url}}"],
+              "path": ["api", "bookings", "explain"]
+            },
+            "description": "Get MongoDB explain plan for scatter-gather query\nShows: nShards=3, queried all booking shards"
+          },
+          "response": []
+        }
+      ],
+      "description": "Test data distribution and query performance across geographic shards"
+    },
+    {
+      "name": "🔍 6. Sharding Analytics",
+      "item": [
+        {
+          "name": "Collection Statistics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{booking_service_url}}/api/bookings/stats",
+              "host": ["{{booking_service_url}}"],
+              "path": ["api", "bookings", "stats"]
+            },
+            "description": "Get bookings collection statistics:\n- Total documents\n- Storage size\n- Index size\n- Average document size"
+          },
+          "response": []
+        },
+        {
+          "name": "Shard Distribution Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{booking_service_url}}/api/bookings/shards",
+              "host": ["{{booking_service_url}}"],
+              "path": ["api", "bookings", "shards"]
+            },
+            "description": "Get detailed shard distribution:\n- Documents per shard\n- Storage per shard\n- Chunk distribution\n- Zone assignments"
+          },
+          "response": []
+        },
+        {
+          "name": "Zone Range Configuration",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/mongodb/zones/bookings",
+              "host": ["{{base_url}}"],
+              "path": ["api", "mongodb", "zones", "bookings"]
+            },
+            "description": "Get zone range configuration for bookings collection:\n- ZONE_NORTH: HANOI, HAI_PHONG, QUANG_NINH\n- ZONE_SOUTH: HO_CHI_MINH, VUNG_TAU, CAN_THO\n- ZONE_CENTRAL: DA_NANG, HUE, NHA_TRANG"
+          },
+          "response": []
+        },
+        {
+          "name": "Balancer Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/mongodb/balancer",
+              "host": ["{{base_url}}"],
+              "path": ["api", "mongodb", "balancer"]
+            },
+            "description": "Check MongoDB balancer status:\n- Is balancer running?\n- Last balancing round\n- Chunk migrations in progress"
+          },
+          "response": []
+        }
+      ],
+      "description": "Analytics and monitoring for sharding cluster"
+    },
+    {
+      "name": "🌐 7. Tailscale Cross-Network Tests",
+      "item": [
+        {
+          "name": "Gateway via Tailscale",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{tailscale_ip}}:8000/health",
+              "protocol": "http",
+              "host": ["{{tailscale_ip}}"],
+              "port": "8000",
+              "path": ["health"]
+            },
+            "description": "Test Gateway via Tailscale VPN"
+          },
+          "response": []
+        },
+        {
+          "name": "User Service via Tailscale",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{tailscale_ip}}:8001/health",
+              "protocol": "http",
+              "host": ["{{tailscale_ip}}"],
+              "port": "8001",
+              "path": ["health"]
+            },
+            "description": "Test User Service via Tailscale VPN"
+          },
+          "response": []
+        },
+        {
+          "name": "Booking Service via Tailscale",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{tailscale_ip}}:8003/health",
+              "protocol": "http",
+              "host": ["{{tailscale_ip}}"],
+              "port": "8003",
+              "path": ["health"]
+            },
+            "description": "Test Booking Service via Tailscale VPN"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Booking via Tailscale",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{customer_hanoi_id}}\",\n  \"vehicle_id\": \"vehicle_vpn_001\",\n  \"pickup_location\": \"HANOI\",\n  \"dropoff_location\": \"QUANG_NINH\",\n  \"start_date\": \"2024-03-01T08:00:00Z\",\n  \"end_date\": \"2024-03-03T18:00:00Z\",\n  \"total_price\": 3000000,\n  \"status\": \"confirmed\"\n}"
+            },
+            "url": {
+              "raw": "http://{{tailscale_ip}}:8003/api/bookings",
+              "protocol": "http",
+              "host": ["{{tailscale_ip}}"],
+              "port": "8003",
+              "path": ["api", "bookings"]
+            },
+            "description": "Create booking through Tailscale network"
+          },
+          "response": []
+        }
+      ],
+      "description": "Test cross-network communication via Tailscale VPN"
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "default"
+    },
+    {
+      "key": "user_service_url",
+      "value": "http://localhost:8001",
+      "type": "default"
+    },
+    {
+      "key": "booking_service_url",
+      "value": "http://localhost:8003",
+      "type": "default"
+    },
+    {
+      "key": "tailscale_ip",
+      "value": "100.69.63.99",
+      "type": "default"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "secret"
+    },
+    {
+      "key": "customer_hanoi_id",
+      "value": "",
+      "type": "default"
+    },
+    {
+      "key": "customer_hcm_id",
+      "value": "",
+      "type": "default"
+    },
+    {
+      "key": "customer_danang_id",
+      "value": "",
+      "type": "default"
+    },
+    {
+      "key": "booking_hanoi_id",
+      "value": "",
+      "type": "default"
+    },
+    {
+      "key": "booking_hcm_id",
+      "value": "",
+      "type": "default"
+    },
+    {
+      "key": "booking_danang_id",
+      "value": "",
+      "type": "default"
+    }
+  ]
+}

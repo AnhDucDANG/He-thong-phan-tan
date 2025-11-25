@@ -5,7 +5,7 @@ from fastapi import HTTPException
 from typing import Dict, Any
 
 
-async def verify_user_license(user_id: int) -> bool:
+async def verify_user_license(user_id: str) -> bool:
     """
     Gọi User Service để xác thực giấy phép lái xe của người dùng.
     """
