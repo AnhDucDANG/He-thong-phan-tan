@@ -11,8 +11,8 @@ services:
       - "100.65.117.32:8003:8003"
     
     environment:
-      - MONGO_URL=mongodb://100.69.63.99:27017/rental_db
-      - MONGO_DB=rental_db
+      - MONGO_URL=mongodb://100.69.63.99:27017/rental
+      - MONGO_DB=rental
       
       - SERVICE_PORT=8003
       - SERVICE_HOST=0.0.0.0

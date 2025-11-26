@@ -4,11 +4,11 @@ from datetime import datetime, date, timedelta
 
 # Trạng thái đặt xe
 BookingStatus = Literal[
-    "pending",
-    "confirmed",   
-    "cancelled",   
-    "completed",   
-    "rejected"     
+    "PENDING",
+    "CONFIRMED",   
+    "CANCELLED",   
+    "COMPLETED",   
+    "REJECTED"     
 ]
 
 
@@ -50,8 +50,8 @@ class BookingCreate(BookingBase):
     pickup_location: Literal["HANOI", "HOCHIMINH", "DANANG"] = Field(
         ..., description="Địa điểm nhận xe - dùng làm shard key"
     )
-    # status mặc định là 'pending'
-    status: Literal["pending"] = "pending"   
+    # status mặc định là 'PENDING'
+    status: Literal["PENDING"] = "PENDING"   
 
 
 class BookingUpdate(BaseModel):
@@ -72,7 +72,7 @@ class BookingResponse(BookingBase):
     """Schema for the booking object returned by the API."""
     
     id: str = Field(..., description="MongoDB ObjectId as string")
-    
+    pickup_location: Literal["HANOI", "HOCHIMINH", "DANANG"]
     book_price: float = Field(..., description="Final calculated price of the booking.")
     
     # Đơn giá, số ngày thuê
@@ -89,7 +89,7 @@ class BookingResponse(BookingBase):
         json_schema_extra = {
             "example": {
                 "id": "15",
-                "user_id": 101,
+                "user_id": "101",
                 "car_id": "CAR-ABC-123",
                 "pickup_location": "Sân bay Tân Sơn Nhất",
                 "return_location": "Quận 1, TP.HCM",
@@ -98,7 +98,7 @@ class BookingResponse(BookingBase):
                 "daily_rate": 500.00,
                 "total_days": 4,
                 "book_price": 2000.00,
-                "status": "confirmed",
+                "status": "CONFIRMED",
                 "created_at": "2025-11-20T15:30:00",
                 "updated_at": "2025-11-20T16:00:00"
             }

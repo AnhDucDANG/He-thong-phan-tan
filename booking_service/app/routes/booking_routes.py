@@ -13,28 +13,36 @@ router = APIRouter(prefix="/bookings", tags=["bookings"])
 async def create_booking(booking_data: BookingCreate):
 
     # b1: gọi User service verify blx của khách
-    await user_service.verify_user_license(int(booking_data.user_id))
+    await user_service.verify_user_license(booking_data.user_id)
+    print(f"Bypass verify user {booking_data.user_id}")
     
     # b2: gọi Car Service check xe available và lấy đơn giá
-    car_info = await car_service.check_car_availability(
-        booking_data.car_id,
-        booking_data.start_date.date(),
-        booking_data.end_date.date()
-    )
-    daily_rate = float(car_info.get("daily_rate", 0))
+    #car_info = await car_service.check_car_availability(
+    #    booking_data.car_id,
+    #    booking_data.start_date.date(),
+    #    booking_data.end_date.date()
+    #)
+    #daily_rate = float(car_info.get("dailyRate", 0))
+    car_info = {"daily_rate": 750.0}  # tạm giả lập xe có giá 750k/ngày
+    daily_rate = 750.0
 
     # b3: tính bill
     delta = booking_data.end_date - booking_data.start_date
-    total_days = delta.days + 1
-    total_amount = daily_rate * total_days
+    total_days = delta.days + (1 if delta.seconds > 0 else 0)
+    book_price = daily_rate * total_days
     
     # b4: gọi Payment service
-    # payment_status = await payment_service.process_payment("booking_id thật", total_amount)
+    # payment_status = await payment_service.process_payment("booking_id thật", book_price)
     payment_status = "CONFIRMED"
 
     # b5: lưu vào DB
     try:
-        db_booking = await create_booking_transaction(booking_data, total_amount)
+        db_booking = await create_booking_transaction(
+            booking_data,
+            daily_rate=daily_rate, 
+            total_days=total_days, 
+            book_price=book_price
+        )
 
     except ValueError as e:
         # Lỗi validation (user_id, car_id không hợp lệ)
@@ -47,6 +55,10 @@ async def create_booking(booking_data: BookingCreate):
             raise HTTPException(status_code=409, detail=str(e))
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
+    if payment_status == "CONFIRMED":
+        db_booking.status = "CONFIRMED"
+        await db_booking.save()
+
     # b6: đánh dấu xe đã đặt (fire-and-forget)
     import asyncio
     asyncio.create_task(car_service.mark_car_as_booked(booking_data.car_id, str(db_booking.id)))
@@ -55,12 +67,13 @@ async def create_booking(booking_data: BookingCreate):
         id=str(db_booking.id),
         user_id=db_booking.user_id,
         car_id=db_booking.car_id,
+        pickup_location=booking_data.pickup_location,
         start_date=db_booking.start_date,
         end_date=db_booking.end_date,
         book_price=db_booking.book_price,
         daily_rate=db_booking.daily_rate,         
         total_days=db_booking.total_days,         
-        status=db_booking.status.lower(),
+        status=db_booking.status,
         created_at=db_booking.created_at,
         updated_at=db_booking.updated_at,
     )

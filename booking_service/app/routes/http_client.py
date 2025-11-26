@@ -39,14 +39,18 @@ async def post_request(base_url: str, endpoint: str, data: Dict[str, Any]) -> Di
         # Lỗi kết nối
         raise Exception(f"External POST connection error to {url}: {e}") from e
 
+def build_url(base_url: str, endpoint: str) -> str:
+    return f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
+
 async def get_request(base_url: str, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Gửi Request GET đến một service bên ngoài."""
-    url = f"{base_url}{endpoint}"
+    url = build_url(base_url, endpoint)
     try:
-        response = await client.get(url, params=params)
-        response.raise_for_status()
-        return response.json()
-    except httpx.HTTPStatusError as e:
-        raise e
+        async with httpx.AsyncClient(timeout=5) as client:
+            response = await client.get(url, params=params)
+            response.raise_for_status()
+            return response.json()
+
     except httpx.RequestError as e:
-        raise Exception(f"External GET connection error to {url}: {e}") from e
+        print("GET ERROR:", repr(e))
+        raise Exception(f"External GET connection error: {repr(e)}") from e

@@ -5,12 +5,12 @@ from fastapi import HTTPException
 from typing import Dict, Any
 
 
-async def verify_user_license(user_id: int) -> bool:
+async def verify_user_license(user_id: str) -> bool:
     """
     Gọi User Service để xác thực giấy phép lái xe của người dùng.
     """
     user_service_url = settings.USER_SERVICE_URL
-    endpoint = f"/api/v1/users/{user_id}/verify"
+    endpoint = f"/users/{user_id}/verify"
 
     try:
         # Sử dụng GET Request

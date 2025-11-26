@@ -18,13 +18,13 @@ class Settings:
     # Auth / token config
     SECRET_KEY = os.getenv("SECRET_KEY", "CHANGE_ME")
     ALGORITHM = os.getenv("ALGORITHM", "HS256")
-    ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+    ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
     MONGO_URL = os.getenv("MONGO_URL")
     if not MONGO_URL:
-        MONGO_URL = "mongodb://100.69.63.99:27018/rental_db"
+        MONGO_URL = "mongodb://100.69.63.99:27017"
     
-    MONGO_DB = os.getenv("MONGO_DB", "rental_db")
+    MONGO_DB = os.getenv("MONGO_DB", "rental")
         
     SERVICE_MAP = {
         "users": USER_SERVICE_URL,

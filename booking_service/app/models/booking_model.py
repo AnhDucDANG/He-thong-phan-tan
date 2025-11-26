@@ -1,28 +1,17 @@
 from beanie import Document, Indexed, PydanticObjectId
 from datetime import datetime
 from typing import Optional, Literal, List, Tuple
-
+from pydantic import Field
 
 class Booking(Document):
     # ID: Beanie tự động thêm _id: PydanticObjectId,
 
-    # Liên kết với Service 3 (User)
-    user_id: int 
-    
-    # Liên kết với Service 1 (Car)
+    user_id: str
     car_id: str
-    
-    # Thời gian thuê
     start_date: datetime
     end_date: datetime
-    
-    # Giá
     book_price: float
-
-    # Giá thuê theo ngày
-    daily_rate: float
-
-    # Số ngày thuê
+    daily_rate: float   #đơn giá thuê theo ngày
     total_days: int
 
     # Điểm nhận xe sử dụng Literal (Enum-like) để giới hạn giá trị
@@ -30,12 +19,12 @@ class Booking(Document):
 
     # Trạng thái sử dụng Literal (Enum-like) để giới hạn giá trị
     status: Literal[
-        "PENDING_PAYMENT", 
-        "PENDING_CONFIRM", 
+        "PENDING",
         "CONFIRMED", 
         "CANCELLED", 
-        "COMPLETED"
-    ] = "PENDING_PAYMENT" 
+        "COMPLETED",
+        "REJECTED"
+    ] = "PENDING" 
     
     # Thời gian tạo
     created_at: datetime = datetime.utcnow() 
@@ -51,10 +40,11 @@ class Booking(Document):
         indexes = [
             # Index 1: Hỗ trợ query nhanh các booking theo xe và trạng thái
             # e.g., Booking.find({'car_id': 'X', 'status': 'CONFIRMED'})
-            [("car_id", 1), ("status", 1)],
+            [("pickup_location", 1), ("car_id", 1), ("status", 1)],
             
             # Index 2: Hỗ trợ query kiểm tra trùng lặp lịch (Booking Overlap Check)
             [
+                ("pickup_location", 1),
                 ("car_id", 1),
                 ("start_date", 1),
                 ("end_date", 1),
@@ -63,12 +53,12 @@ class Booking(Document):
             ],
             
             # Index 3: Index để tìm kiếm nhanh theo user_id
-            "user_id" 
+            [("pickup_location", 1), ("user_id", 1)] 
         ]
         
         use_shard_key = True
-        shard_keys = [{"pickup_location": 1}]
-        # hoặc shard_keys = [{"pickup_location": "hashed"}]
-        
+        #shard_keys = [{"pickup_location": 1}]
+        shard_keys = [{"pickup_location": "hashed"}]
+
         # Tuỳ chọn: Tăng tốc độ parsing Pydantic
         keep_union_tag = True

@@ -11,7 +11,7 @@ async def check_car_availability(car_id: str, start_date: date, end_date: date) 
     """
     Gọi Car Service để kiểm tra tính sẵn có và lấy thông tin chi tiết (giá).
     """
-    endpoint = f"/api/v1/cars/{car_id}/availability" 
+    endpoint = f"/api/vehicles/{car_id}" 
     
     # Chuyển đổi date thành string ISO 8601
     params = {
@@ -23,7 +23,7 @@ async def check_car_availability(car_id: str, start_date: date, end_date: date) 
         # Sử dụng GET Request
         response_data = await get_request(CAR_SERVICE_URL, endpoint, params=params)
         
-        if not response_data.get("is_available"):
+        if not response_data.get("isDeleted", False):
             raise HTTPException(status_code=404, detail="Xe không có sẵn trong khoảng thời gian này.")
             
         return response_data # Bao gồm giá thuê, thông tin xe...
@@ -40,7 +40,7 @@ async def mark_car_as_booked(car_id: str, booking_id: str):
     """
     Gọi Car Service để đánh dấu xe là đã được đặt sau khi tạo đơn hàng thành công.
     """
-    endpoint = f"/api/v1/cars/{car_id}/mark-booked"
+    endpoint = f"/api/cars/{car_id}/mark-booked"
     data = {"booking_id": booking_id, "status": "RESERVED"}
 
     try:
