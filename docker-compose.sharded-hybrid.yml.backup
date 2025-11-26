@@ -334,9 +334,9 @@ services:
       - GATEWAY_HOST=0.0.0.0
       - GATEWAY_PORT=8000
       - USER_SERVICE_URL=http://user_service:8001
-      - VEHICLE_SERVICE_URL=${VEHICLE_SERVICE_URL}
-      - BOOKING_SERVICE_URL=${BOOKING_SERVICE_URL}
-      - PAYMENT_SERVICE_URL=${PAYMENT_SERVICE_URL}
+      - VEHICLE_SERVICE_URL=http://booking_service:8003
+      - BOOKING_SERVICE_URL=http://booking_service:8003
+      - PAYMENT_SERVICE_URL=http://payment_service:8004
     depends_on:
       user_service:
         condition: service_healthy
@@ -348,6 +348,39 @@ services:
       timeout: 5s
       retries: 5
 
+  # ==================== BOOKING SERVICE ====================
+  booking_service:
+    build:
+      context: ./booking_service
+      dockerfile: Dockerfile
+    container_name: rental-booking-service
+    restart: unless-stopped
+    ports:
+      - "8003:8003"
+    environment:
+      - MONGO_URL=mongodb://mongos:27017
+      - MONGO_DB=rental
+      - SERVICE_HOST=0.0.0.0
+      - SERVICE_PORT=8003
+      - USER_SERVICE_URL=http://user_service:8001
+      - VEHICLE_SERVICE_URL=http://booking_service:8003
+      - BOOKING_SERVICE_URL=http://booking_service:8003
+      - PAYMENT_SERVICE_URL=http://payment_service:8004
+      - SECRET_KEY=${SECRET_KEY}
+      - ALGORITHM=${ALGORITHM}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
+    depends_on:
+      cluster-init:
+        condition: service_completed_successfully
+      user_service:
+        condition: service_healthy
+    networks:
+      - rental-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   mongo_config_data:
