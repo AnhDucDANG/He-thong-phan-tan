@@ -14,34 +14,32 @@ async def create_booking(booking_data: BookingCreate):
 
     # b1: gọi User service verify blx của khách
     await user_service.verify_user_license(booking_data.user_id)
-    print(f"Bypass verify user {booking_data.user_id}")
     
     # b2: gọi Car Service check xe available và lấy đơn giá
-    #car_info = await car_service.check_car_availability(
-    #    booking_data.car_id,
-    #    booking_data.start_date.date(),
-    #    booking_data.end_date.date()
-    #)
-    #daily_rate = float(car_info.get("dailyRate", 0))
-    car_info = {"daily_rate": 750.0}  # tạm giả lập xe có giá 750k/ngày
-    daily_rate = 750.0
+    car_info = await car_service.check_car_availability(
+        booking_data.car_id,
+        booking_data.start_date.date(),
+        booking_data.end_date.date()
+    )
+    # Vehicle service trả về dailyRate (camelCase)
+    daily_rate = float(car_info.get("dailyRate", 0))
 
     # b3: tính bill
     delta = booking_data.end_date - booking_data.start_date
-    total_days = delta.days + (1 if delta.seconds > 0 else 0)
-    book_price = daily_rate * total_days
+    total_days = delta.days + 1
+    total_amount = daily_rate * total_days
     
     # b4: gọi Payment service
-    # payment_status = await payment_service.process_payment("booking_id thật", book_price)
+    # payment_status = await payment_service.process_payment("booking_id thật", total_amount)
     payment_status = "CONFIRMED"
 
     # b5: lưu vào DB
     try:
         db_booking = await create_booking_transaction(
-            booking_data,
-            daily_rate=daily_rate, 
-            total_days=total_days, 
-            book_price=book_price
+            booking_data, 
+            book_price=total_amount,
+            daily_rate=daily_rate,
+            total_days=total_days
         )
 
     except ValueError as e:
@@ -55,28 +53,47 @@ async def create_booking(booking_data: BookingCreate):
             raise HTTPException(status_code=409, detail=str(e))
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
-    if payment_status == "CONFIRMED":
-        db_booking.status = "CONFIRMED"
-        await db_booking.save()
-
     # b6: đánh dấu xe đã đặt (fire-and-forget)
     import asyncio
     asyncio.create_task(car_service.mark_car_as_booked(booking_data.car_id, str(db_booking.id)))
     
     return BookingResponse(
         id=str(db_booking.id),
-        user_id=db_booking.user_id,
-        car_id=db_booking.car_id,
-        pickup_location=booking_data.pickup_location,
+        user_id=str(db_booking.user_id),
+        car_id=str(db_booking.car_id),
         start_date=db_booking.start_date,
         end_date=db_booking.end_date,
         book_price=db_booking.book_price,
         daily_rate=db_booking.daily_rate,         
         total_days=db_booking.total_days,         
-        status=db_booking.status,
+        status=db_booking.status.lower(),
         created_at=db_booking.created_at,
         updated_at=db_booking.updated_at,
     )
+
+# Api lấy danh sách bookings
+@router.get("/", response_model=list[BookingResponse], status_code=200)
+async def get_all_bookings(skip: int = 0, limit: int = 100):
+    """
+    Lấy danh sách tất cả bookings với pagination
+    """
+    bookings = await Booking.find_all().skip(skip).limit(limit).to_list()
+    return [
+        BookingResponse(
+            id=str(b.id),
+            user_id=str(b.user_id),
+            car_id=str(b.car_id),
+            start_date=b.start_date,
+            end_date=b.end_date,
+            book_price=b.book_price,
+            daily_rate=b.daily_rate,
+            total_days=b.total_days,
+            status=b.status.lower(),  # Convert UPPERCASE to lowercase
+            created_at=b.created_at,
+            updated_at=b.updated_at
+        )
+        for b in bookings
+    ]
 
 # Api xem Booking
 @router.get("/{booking_id}", response_model=BookingResponse, status_code=200)
@@ -84,25 +101,35 @@ async def get_booking_details(booking_id: str):
     """
     Lấy chi tiết một booking theo ID
     """
-    try:
-        # Chuyển string → ObjectId rồi tìm trong DB
-        booking = await Booking.get(PydanticObjectId(booking_id))
-        
-        if not booking:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Booking with id {booking_id} not found"
-            )
-        
-        return booking
+    # Kiểm tra format ObjectId trước
+    if not PydanticObjectId.is_valid(booking_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid booking ID format"
+        )
     
-    except Exception as e:
-        # Nếu booking_id không phải ObjectId hợp lệ
-        if "invalid" in str(e).lower() or "objectid" in str(e).lower():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid booking ID format"
-            )
+    # Chuyển string → ObjectId rồi tìm trong DB
+    booking = await Booking.get(PydanticObjectId(booking_id))
+    
+    if not booking:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Booking with id {booking_id} not found"
+        )
+    
+    return BookingResponse(
+        id=str(booking.id),
+        user_id=str(booking.user_id),
+        car_id=str(booking.car_id),
+        start_date=booking.start_date,
+        end_date=booking.end_date,
+        book_price=booking.book_price,
+        daily_rate=booking.daily_rate,
+        total_days=booking.total_days,
+        status=booking.status.lower(),
+        created_at=booking.created_at,
+        updated_at=booking.updated_at
+    )
 
 # Api hủy Booking
 @router.post("/{booking_id}/cancel")
