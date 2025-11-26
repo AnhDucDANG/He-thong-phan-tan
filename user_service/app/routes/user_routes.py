@@ -588,6 +588,29 @@ async def get_all_users(admin_user: dict = Depends(get_current_admin)):
         
     return users
 
+@router.get("/users/{user_id}/verify", response_model=dict)
+async def verify_user(
+    user_id: str
+):
+    """Verify user exists and is valid (No authentication required for inter-service calls)"""
+    if not ObjectId.is_valid(user_id):
+        raise HTTPException(status_code=400, detail="Invalid user ID format")
+        
+    users_collection = get_users_collection()
+    user = await users_collection.find_one({"_id": ObjectId(user_id), "is_deleted": False})
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Return verification result
+    return {
+        "user_id": str(user["_id"]),
+        "email": user["email"],
+        "role": user.get("role", "customer"),
+        "is_valid": True,
+        "is_verified": user.get("is_verified", False)
+    }
+
 @router.get("/users/{user_id}", response_model=UserResponse)
 async def get_user_by_id(
     user_id: str,

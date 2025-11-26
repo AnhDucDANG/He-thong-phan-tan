@@ -9,7 +9,6 @@ services:
     command: mongod --configsvr --replSet configReplSet --port 27019 --bind_ip_all
     ports:
       - "27019:27019"
-      - "${MY_TAILSCALE_IP}:27019:27019"
     volumes:
       - mongo_config_data:/data/configdb
     networks:
@@ -59,7 +58,6 @@ services:
     command: mongod --shardsvr --replSet shard1ReplSet --port 27021 --bind_ip_all
     ports:
       - "27021:27021"
-      - "${MY_TAILSCALE_IP}:27021:27021"
     volumes:
       - mongo_shard1_data:/data/db
     networks:
@@ -79,7 +77,6 @@ services:
     command: mongod --shardsvr --replSet shard2ReplSet --port 27022 --bind_ip_all
     ports:
       - "27022:27022"
-      - "${MY_TAILSCALE_IP}:27022:27022"
     volumes:
       - mongo_shard2_data:/data/db
     networks:
@@ -100,7 +97,6 @@ services:
     command: mongod --shardsvr --replSet shard3aReplSet --port 27025 --bind_ip_all
     ports:
       - "27025:27025"
-      - "${MY_TAILSCALE_IP}:27025:27025"
     volumes:
       - mongo_shard3a_data:/data/db
     networks:
@@ -127,7 +123,6 @@ services:
     command: mongod --shardsvr --replSet shard3bReplSet --port 27026 --bind_ip_all
     ports:
       - "27026:27026"
-      - "${MY_TAILSCALE_IP}:27026:27026"
     volumes:
       - mongo_shard3b_data:/data/db
     networks:
@@ -154,7 +149,6 @@ services:
     command: mongod --shardsvr --replSet shard3cReplSet --port 27027 --bind_ip_all
     ports:
       - "27027:27027"
-      - "${MY_TAILSCALE_IP}:27027:27027"
     volumes:
       - mongo_shard3c_data:/data/db
     networks:
@@ -181,7 +175,6 @@ services:
     command: mongod --shardsvr --replSet shard4ReplSet --port 27024 --bind_ip_all
     ports:
       - "27024:27024"
-      - "${MY_TAILSCALE_IP}:27024:27024"
     volumes:
       - mongo_shard4_data:/data/db
     networks:
@@ -243,7 +236,6 @@ services:
     command: mongos --configdb configReplSet/mongo-config:27019 --port 27017 --bind_ip_all
     ports:
       - "27017:27017"
-      - "${MY_TAILSCALE_IP}:27017:27017"
     depends_on:
       shards-init:
         condition: service_completed_successfully
@@ -310,7 +302,6 @@ services:
     restart: unless-stopped
     ports:
       - "8001:8001"
-      - "${MY_TAILSCALE_IP}:8001:8001"
     environment:
       - MONGO_URL=mongodb://mongos:27017
       - MONGO_DB=rental
@@ -339,14 +330,13 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
-      - "${MY_TAILSCALE_IP}:8000:8000"
     environment:
       - GATEWAY_HOST=0.0.0.0
       - GATEWAY_PORT=8000
       - USER_SERVICE_URL=http://user_service:8001
-      - VEHICLE_SERVICE_URL=${VEHICLE_SERVICE_URL}
-      - BOOKING_SERVICE_URL=${BOOKING_SERVICE_URL}
-      - PAYMENT_SERVICE_URL=${PAYMENT_SERVICE_URL}
+      - VEHICLE_SERVICE_URL=http://booking_service:8003
+      - BOOKING_SERVICE_URL=http://booking_service:8003
+      - PAYMENT_SERVICE_URL=http://payment_service:8004
     depends_on:
       user_service:
         condition: service_healthy
@@ -354,6 +344,40 @@ services:
       - rental-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==================== BOOKING SERVICE ====================
+  booking_service:
+    build:
+      context: ./booking_service
+      dockerfile: Dockerfile
+    container_name: rental-booking-service
+    restart: unless-stopped
+    ports:
+      - "8003:8003"
+    environment:
+      - MONGO_URL=mongodb://mongos:27017
+      - MONGO_DB=rental
+      - SERVICE_HOST=0.0.0.0
+      - SERVICE_PORT=8003
+      - USER_SERVICE_URL=http://user_service:8001
+      - VEHICLE_SERVICE_URL=http://booking_service:8003
+      - BOOKING_SERVICE_URL=http://booking_service:8003
+      - PAYMENT_SERVICE_URL=http://payment_service:8004
+      - SECRET_KEY=${SECRET_KEY}
+      - ALGORITHM=${ALGORITHM}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
+    depends_on:
+      cluster-init:
+        condition: service_completed_successfully
+      user_service:
+        condition: service_healthy
+    networks:
+      - rental-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
       interval: 10s
       timeout: 5s
       retries: 5
