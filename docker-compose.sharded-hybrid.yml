@@ -334,7 +334,7 @@ services:
       - GATEWAY_HOST=0.0.0.0
       - GATEWAY_PORT=8000
       - USER_SERVICE_URL=http://user_service:8001
-      - VEHICLE_SERVICE_URL=http://booking_service:8003
+      - VEHICLE_SERVICE_URL=http://vehicle_service:8002
       - BOOKING_SERVICE_URL=http://booking_service:8003
       - PAYMENT_SERVICE_URL=http://payment_service:8004
     depends_on:
@@ -348,6 +348,32 @@ services:
       timeout: 5s
       retries: 5
 
+  
+  # ==================== VEHICLE SERVICE ====================
+  vehicle_service:
+    build:
+      context: ./vehicle-service
+      dockerfile: Dockerfile
+    container_name: rental-vehicle-service
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    environment:
+      - MONGO_URI=mongodb://mongos:27017/rental
+      - PORT=8002
+      - USER_SERVICE_URL=http://user_service:8001
+    depends_on:
+      cluster-init:
+        condition: service_completed_successfully
+    networks:
+      - rental-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8002/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+      
   # ==================== BOOKING SERVICE ====================
   booking_service:
     build:
@@ -363,7 +389,7 @@ services:
       - SERVICE_HOST=0.0.0.0
       - SERVICE_PORT=8003
       - USER_SERVICE_URL=http://user_service:8001
-      - VEHICLE_SERVICE_URL=http://booking_service:8003
+      - VEHICLE_SERVICE_URL=http://vehicle_service:8002
       - BOOKING_SERVICE_URL=http://booking_service:8003
       - PAYMENT_SERVICE_URL=http://payment_service:8004
       - SECRET_KEY=${SECRET_KEY}
@@ -381,6 +407,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
 
 volumes:
   mongo_config_data:

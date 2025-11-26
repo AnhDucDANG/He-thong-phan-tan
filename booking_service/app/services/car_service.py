@@ -9,9 +9,9 @@ CAR_SERVICE_URL = settings.VEHICLE_SERVICE_URL
 
 async def check_car_availability(car_id: str, start_date: date, end_date: date) -> Dict[str, Any]:
     """
-    Gọi Car Service để kiểm tra tính sẵn có và lấy thông tin chi tiết (giá).
+    Gọi Vehicle Service để kiểm tra xe có tồn tại và lấy thông tin (giá, trạng thái).
     """
-    endpoint = f"/api/v1/cars/{car_id}/availability" 
+    endpoint = f"/api/vehicles/{car_id}" 
     
     # Chuyển đổi date thành string ISO 8601
     params = {
@@ -20,13 +20,18 @@ async def check_car_availability(car_id: str, start_date: date, end_date: date) 
     }
 
     try:
-        # Sử dụng GET Request
-        response_data = await get_request(CAR_SERVICE_URL, endpoint, params=params)
+        # Sử dụng GET Request để lấy thông tin xe
+        response_data = await get_request(CAR_SERVICE_URL, endpoint)
         
-        if not response_data.get("is_available"):
-            raise HTTPException(status_code=404, detail="Xe không có sẵn trong khoảng thời gian này.")
+        # Kiểm tra trạng thái xe (available, on_rent, maintenance, out_of_service)
+        if response_data.get("status") != "available":
+            raise HTTPException(status_code=400, detail=f"Xe không có sẵn. Trạng thái hiện tại: {response_data.get('status')}")
+        
+        # Kiểm tra xe có bị xóa không
+        if response_data.get("isDeleted"):
+            raise HTTPException(status_code=404, detail="Xe đã bị xóa khỏi hệ thống.")
             
-        return response_data # Bao gồm giá thuê, thông tin xe...
+        return response_data # Bao gồm dailyRate, thông tin xe...
         
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 404:
@@ -38,14 +43,20 @@ async def check_car_availability(car_id: str, start_date: date, end_date: date) 
 
 async def mark_car_as_booked(car_id: str, booking_id: str):
     """
-    Gọi Car Service để đánh dấu xe là đã được đặt sau khi tạo đơn hàng thành công.
+    Gọi Vehicle Service để cập nhật trạng thái xe thành on_rent và lưu booking record.
     """
-    endpoint = f"/api/v1/cars/{car_id}/mark-booked"
-    data = {"booking_id": booking_id, "status": "RESERVED"}
+    endpoint = f"/api/vehicles/{car_id}"
+    data = {
+        "status": "on_rent",
+        "bookingRecords": [{"bookingId": booking_id}]
+    }
 
     try:
-        # Sử dụng POST Request
-        await post_request(CAR_SERVICE_URL, endpoint, data)
+        # Sử dụng PUT Request để cập nhật vehicle
+        import httpx
+        async with httpx.AsyncClient() as client:
+            response = await client.put(f"{CAR_SERVICE_URL}{endpoint}", json=data)
+            response.raise_for_status()
     except Exception as e:
         # Lưu ý: Nếu bước này thất bại, cần có logic Rollback/Saga (topic nâng cao)
         print(f"WARNING: Failed to mark car {car_id} as booked on Car Service: {e}")

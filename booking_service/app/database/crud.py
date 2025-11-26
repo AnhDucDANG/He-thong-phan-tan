@@ -3,7 +3,7 @@ from ..models.booking_model import Booking
 from ..schemas.booking_schema import BookingCreate
 from datetime import datetime
 
-async def create_booking_transaction(booking_data: BookingCreate, total_amount: float) -> Booking:
+async def create_booking_transaction(booking_data: BookingCreate, book_price: float, daily_rate: float, total_days: int) -> Booking:
     """
     Create a new booking in the database with transaction support
     """
@@ -16,10 +16,10 @@ async def create_booking_transaction(booking_data: BookingCreate, total_amount: 
         start_date=booking_data.start_date,
         end_date=booking_data.end_date,
         pickup_location=booking_data.pickup_location,
-        dropoff_location=booking_data.dropoff_location,
-        total_amount=total_amount,
+        book_price=book_price,
+        daily_rate=daily_rate,
+        total_days=total_days,
         status="CONFIRMED",
-        payment_status="PENDING",
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow()
     )

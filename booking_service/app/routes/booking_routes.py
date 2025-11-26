@@ -21,7 +21,8 @@ async def create_booking(booking_data: BookingCreate):
         booking_data.start_date.date(),
         booking_data.end_date.date()
     )
-    daily_rate = float(car_info.get("daily_rate", 0))
+    # Vehicle service trả về dailyRate (camelCase)
+    daily_rate = float(car_info.get("dailyRate", 0))
 
     # b3: tính bill
     delta = booking_data.end_date - booking_data.start_date
@@ -34,7 +35,12 @@ async def create_booking(booking_data: BookingCreate):
 
     # b5: lưu vào DB
     try:
-        db_booking = await create_booking_transaction(booking_data, total_amount)
+        db_booking = await create_booking_transaction(
+            booking_data, 
+            book_price=total_amount,
+            daily_rate=daily_rate,
+            total_days=total_days
+        )
 
     except ValueError as e:
         # Lỗi validation (user_id, car_id không hợp lệ)

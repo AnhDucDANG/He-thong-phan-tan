@@ -9,10 +9,10 @@ VEHICLE_SERVICE_URL = settings.VEHICLE_SERVICE_URL
 async def get_vehicle_daily_rate(car_id: str) -> float:
     async with httpx.AsyncClient() as client:
         try:
-            resp = await client.get(f"{VEHICLE_SERVICE_URL}/api/v1/vehicles/{car_id}")
+            resp = await client.get(f"{VEHICLE_SERVICE_URL}/api/vehicles/{car_id}")
             resp.raise_for_status()
             data = resp.json()
-            return float(data["daily_rate"])
+            return float(data["dailyRate"])
         except Exception as e:
             raise HTTPException(status_code=424, detail=f"Cannot get price from Vehicle Service: {str(e)}")
 
