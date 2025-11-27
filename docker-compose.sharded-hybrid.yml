@@ -334,15 +334,9 @@ services:
       - GATEWAY_HOST=0.0.0.0
       - GATEWAY_PORT=8000
       - USER_SERVICE_URL=http://user_service:8001
-<<<<<<< HEAD
       - VEHICLE_SERVICE_URL=${VEHICLE_SERVICE_URL}
       - BOOKING_SERVICE_URL=${BOOKING_SERVICE_URL}
       - PAYMENT_SERVICE_URL=${PAYMENT_SERVICE_URL}
-=======
-      - VEHICLE_SERVICE_URL=http://100.73.22.88:8002
-      - BOOKING_SERVICE_URL=http://100.65.117.32:8003
-      - PAYMENT_SERVICE_URL=http://100.108.163.69:8004
->>>>>>> 30d2137 (refactor: Update main docker-compose for Server 1 deployment with Tailscale IPs)
     depends_on:
       user_service:
         condition: service_healthy
@@ -355,48 +349,6 @@ services:
       retries: 5
       start_period: 30s
 
-
-<<<<<<< HEAD
-=======
-      
-  # ==================== BOOKING SERVICE ====================
-  booking_service:
-    build:
-      context: ./booking_service
-      dockerfile: Dockerfile
-    container_name: rental-booking-service
-    restart: unless-stopped
-    ports:
-      - "8003:8003"
-    environment:
-      - MONGO_URL=mongodb://mongos:27017
-      - MONGO_DB=rental
-      - SERVICE_HOST=0.0.0.0
-      - SERVICE_PORT=8003
-      # API Gateway URL cho inter-service communication
-      - API_GATEWAY_URL=http://api_gateway:8000
-      # Backup URLs (không dùng nếu có API_GATEWAY_URL)
-      - USER_SERVICE_URL=http://user_service:8001
-      - VEHICLE_SERVICE_URL=http://vehicle_service:8002
-      - BOOKING_SERVICE_URL=http://booking_service:8003
-      - PAYMENT_SERVICE_URL=http://payment_service:8004
-      - SECRET_KEY=${SECRET_KEY}
-      - ALGORITHM=${ALGORITHM}
-      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
-    depends_on:
-      cluster-init:
-        condition: service_completed_successfully
-      api_gateway:
-        condition: service_healthy
-    networks:
-      - rental-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
->>>>>>> 30d2137 (refactor: Update main docker-compose for Server 1 deployment with Tailscale IPs)
 
 volumes:
   mongo_config_data:
