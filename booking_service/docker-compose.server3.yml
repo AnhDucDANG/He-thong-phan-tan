@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  booking_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: booking-service-server3
+    network_mode: host
+    environment:
+      - MONGO_URL=mongodb://100.69.63.99:27017
+      - DATABASE_NAME=rental
+      - API_GATEWAY_URL=http://100.69.63.99:8000
+      - VEHICLE_SERVICE_URL=http://100.73.22.88:8002
+      - PAYMENT_SERVICE_URL=http://100.108.163.69:8004
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8003/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s

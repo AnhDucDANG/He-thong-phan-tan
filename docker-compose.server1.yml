@@ -1,0 +1,191 @@
+version: '3.8'
+
+services:
+  # ========== MONGODB SHARDED CLUSTER ==========
+  # Configuration Server
+  mongo-config:
+    image: mongo:7.0
+    container_name: mongo-config
+    command: mongod --configsvr --replSet configReplSet --port 27019 --dbpath /data/db
+    volumes:
+      - mongo-config-data:/data/db
+    networks:
+      - rental-network
+    restart: unless-stopped
+
+  # Shard 1: Users Collection
+  mongo-shard1:
+    image: mongo:7.0
+    container_name: mongo-shard1
+    command: mongod --shardsvr --replSet shard1ReplSet --port 27018 --dbpath /data/db
+    volumes:
+      - mongo-shard1-data:/data/db
+    networks:
+      - rental-network
+    restart: unless-stopped
+
+  # Shard 2: Vehicles Collection
+  mongo-shard2:
+    image: mongo:7.0
+    container_name: mongo-shard2
+    command: mongod --shardsvr --replSet shard2ReplSet --port 27018 --dbpath /data/db
+    volumes:
+      - mongo-shard2-data:/data/db
+    networks:
+      - rental-network
+    restart: unless-stopped
+
+  # Shard 3: Bookings HANOI
+  mongo-shard3:
+    image: mongo:7.0
+    container_name: mongo-shard3
+    command: mongod --shardsvr --replSet shard3ReplSet --port 27018 --dbpath /data/db
+    volumes:
+      - mongo-shard3-data:/data/db
+    networks:
+      - rental-network
+    restart: unless-stopped
+
+  # Shard 4: Bookings HOCHIMINH
+  mongo-shard4:
+    image: mongo:7.0
+    container_name: mongo-shard4
+    command: mongod --shardsvr --replSet shard4ReplSet --port 27018 --dbpath /data/db
+    volumes:
+      - mongo-shard4-data:/data/db
+    networks:
+      - rental-network
+    restart: unless-stopped
+
+  # Shard 5: Bookings DANANG
+  mongo-shard5:
+    image: mongo:7.0
+    container_name: mongo-shard5
+    command: mongod --shardsvr --replSet shard5ReplSet --port 27018 --dbpath /data/db
+    volumes:
+      - mongo-shard5-data:/data/db
+    networks:
+      - rental-network
+    restart: unless-stopped
+
+  # Shard 6: Payments Collection
+  mongo-shard6:
+    image: mongo:7.0
+    container_name: mongo-shard6
+    command: mongod --shardsvr --replSet shard6ReplSet --port 27018 --dbpath /data/db
+    volumes:
+      - mongo-shard6-data:/data/db
+    networks:
+      - rental-network
+    restart: unless-stopped
+
+  # Shard 7: Analytics/Logs Collection
+  mongo-shard7:
+    image: mongo:7.0
+    container_name: mongo-shard7
+    command: mongod --shardsvr --replSet shard7ReplSet --port 27018 --dbpath /data/db
+    volumes:
+      - mongo-shard7-data:/data/db
+    networks:
+      - rental-network
+    restart: unless-stopped
+
+  # Mongos Router
+  mongos:
+    image: mongo:7.0
+    container_name: mongos
+    command: mongos --configdb configReplSet/mongo-config:27019 --port 27017 --bind_ip_all
+    ports:
+      - "27017:27017"
+    depends_on:
+      - mongo-config
+      - mongo-shard1
+      - mongo-shard2
+      - mongo-shard3
+      - mongo-shard4
+      - mongo-shard5
+      - mongo-shard6
+      - mongo-shard7
+    networks:
+      - rental-network
+    restart: unless-stopped
+
+  # MongoDB Setup Container (one-time init)
+  mongo-setup:
+    image: mongo:7.0
+    container_name: mongo-setup
+    depends_on:
+      - mongos
+    networks:
+      - rental-network
+    volumes:
+      - ./init-sharding:/scripts
+    entrypoint: ["bash", "/scripts/run-all.js"]
+    restart: "no"
+
+  # ========== MICROSERVICES ==========
+  # API Gateway
+  api_gateway:
+    build:
+      context: ./api_gateway
+      dockerfile: Dockerfile
+    container_name: rental-api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - USER_SERVICE_URL=http://user_service:8001
+      - VEHICLE_SERVICE_URL=http://100.73.22.88:8002
+      - BOOKING_SERVICE_URL=http://100.65.117.32:8003
+      - PAYMENT_SERVICE_URL=http://100.108.163.69:8004
+    depends_on:
+      user_service:
+        condition: service_healthy
+    networks:
+      - rental-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # User Service
+  user_service:
+    build:
+      context: ./user_service
+      dockerfile: Dockerfile
+    container_name: rental-user-service
+    ports:
+      - "8001:8001"
+    environment:
+      - MONGO_URL=mongodb://mongos:27017
+      - DATABASE_NAME=rental
+      - JWT_SECRET=your-secret-key-here-change-in-production
+      - JWT_ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+    depends_on:
+      - mongos
+    networks:
+      - rental-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+networks:
+  rental-network:
+    driver: bridge
+
+volumes:
+  mongo-config-data:
+  mongo-shard1-data:
+  mongo-shard2-data:
+  mongo-shard3-data:
+  mongo-shard4-data:
+  mongo-shard5-data:
+  mongo-shard6-data:
+  mongo-shard7-data:
