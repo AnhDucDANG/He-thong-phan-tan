@@ -3,14 +3,11 @@ FROM python:3.10-slim
 ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /app
 
-
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ca-certificates gnupg2 apt-transport-https lsb-release \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-
-# Đây là nơi motor và beanie sẽ được cài đặt từ requirements.txt
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 

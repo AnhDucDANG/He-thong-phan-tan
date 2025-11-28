@@ -9,6 +9,9 @@ async def verify_user_license(user_id: str) -> bool:
     """
     Gọi User Service để xác thực giấy phép lái xe của người dùng.
     """
+    if not user_id or user_id.strip() == "":
+        raise HTTPException(status_code=400, detail="User ID is required")
+    
     user_service_url = settings.USER_SERVICE_URL
     endpoint = f"/users/{user_id}/verify"
 

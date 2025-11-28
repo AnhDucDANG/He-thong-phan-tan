@@ -6,7 +6,7 @@ from app.models.booking_model import Booking
 from ..services import user_service, car_service, payment_service
 #dependency nếu cần
 
-router = APIRouter(prefix="/bookings", tags=["bookings"])
+router = APIRouter(tags=["bookings"])
 
 # Api tạo đơn đặt xe
 @router.post("/", response_model=BookingResponse, status_code=201)

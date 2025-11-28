@@ -6,14 +6,14 @@ from typing import Dict, Any
 
 PAYMENT_SERVICE_URL = settings.PAYMENT_SERVICE_URL
 
-async def process_payment(booking_id: str, book_price: float) -> str:
+async def process_payment(booking_id: str, total_amount: float) -> str:
     """
     Gọi Payment Service để xử lý giao dịch thanh toán.
     """
-    endpoint = "/api/payments"
+    endpoint = "/api/v1/payments"
     data = {
         "booking_id": booking_id,
-        "amount": book_price,
+        "amount": total_amount,
         "currency": "VND"
     }
 
