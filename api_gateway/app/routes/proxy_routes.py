@@ -13,6 +13,7 @@ router = APIRouter()
 PUBLIC_PATHS = [
     "/api/users/register",
     "/api/users/login",
+    "/api/vehicles",  # Public for testing - vehicles listing
 ]
 
 def is_public_route(path: str) -> bool:
@@ -63,12 +64,30 @@ async def proxy_request(
     # Get target service URL
     target_base_url = settings.SERVICE_ROUTES[service]
     
-    # Build full target URL
-    # User service expects routes WITHOUT /api prefix
-    if path:
-        target_url = f"{target_base_url}/{path}"
+    # Build full target URL based on service routing convention
+    # - users: Routes at root (e.g., /register, /login, /me, /users)
+    # - bookings: Routes at /bookings (e.g., /bookings/, /bookings/{id})
+    # - vehicles: Routes at /api/vehicles 
+    # - payments: Routes at /api/payments
+    
+    if service == "users":
+        # User service: strip /api/users prefix
+        if path:
+            target_url = f"{target_base_url}/{path}"
+        else:
+            target_url = target_base_url
+    elif service == "bookings":
+        # Booking service: use /bookings prefix
+        if path:
+            target_url = f"{target_base_url}/bookings/{path}"
+        else:
+            target_url = f"{target_base_url}/bookings"
     else:
-        target_url = target_base_url
+        # Other services (vehicles, payments): keep /api/{service} prefix
+        if path:
+            target_url = f"{target_base_url}/api/{service}/{path}"
+        else:
+            target_url = f"{target_base_url}/api/{service}"
     
     logger.info(f"🚀 Forward: {request.method} → {target_url}")
     

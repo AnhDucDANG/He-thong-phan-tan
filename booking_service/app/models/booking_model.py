@@ -1,16 +1,15 @@
 from beanie import Document, Indexed, PydanticObjectId
 from datetime import datetime
 from typing import Optional, Literal, List, Tuple
-from pydantic import Field
 
 
 class Booking(Document):
     # ID: Beanie tự động thêm _id: PydanticObjectId,
 
-    # Liên kết với Service 3 (User) - có thể là ObjectId hoặc string
-    user_id: str
+    # Liên kết với Service 3 (User)
+    user_id: int 
     
-    # Liên kết với Service 1 (Car) - có thể là string ID từ car service
+    # Liên kết với Service 1 (Car)
     car_id: str
     
     # Thời gian thuê

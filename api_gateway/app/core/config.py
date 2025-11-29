@@ -8,8 +8,8 @@ class Settings:
     
     # Microservices URLs
     USER_SERVICE_URL: str = os.getenv("USER_SERVICE_URL", "http://user_service:8001")
-    VEHICLE_SERVICE_URL: str = os.getenv("VEHICLE_SERVICE_URL", "http://localhost:8002")
-    BOOKING_SERVICE_URL: str = os.getenv("BOOKING_SERVICE_URL", "http://localhost:8003")
+    BOOKING_SERVICE_URL: str = os.getenv("BOOKING_SERVICE_URL", "http://booking_service:8003")
+    VEHICLE_SERVICE_URL: str = os.getenv("VEHICLE_SERVICE_URL", "http://100.73.22.88:8002")
     PAYMENT_SERVICE_URL: str = os.getenv("PAYMENT_SERVICE_URL", "http://100.108.163.69:8004")
     
     SERVICE_ROUTES: Dict[str, str] = {
